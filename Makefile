@@ -1,9 +1,9 @@
 SHELL         := /bin/bash
 .DEFAULT_GOAL := help
 
-INSTALL_DIR   ?= $(HOME)/.local/bin
-COMMANDS_DIR  ?= $(HOME)/.claude/commands
-DATADIR       ?= $(HOME)/.claude-auto-code
+INSTALL_DIR          ?= $(HOME)/.local/bin
+COMMANDS_DIR         ?= $(HOME)/.claude/commands
+DATADIR              ?= $(HOME)/.claude-auto-code
 BIN           := $(CURDIR)/bin/autocode
 
 GREEN  := \033[0;32m

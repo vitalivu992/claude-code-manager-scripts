@@ -9,7 +9,7 @@ base_name=$(get_base_name)
 
 LOCK_FILE="$datadir/${base_name}.lock"
 exec 200>"$LOCK_FILE"
-flock -n 200 || { echo "🔒 Another role is running, exiting"; exit 0; }
+flock -n 200 || { echo "🔒 Another role is running, exiting REVIEWER"; exit 0; }
 
 current_state=$(read_state)
 case "$current_state" in

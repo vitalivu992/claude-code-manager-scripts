@@ -24,7 +24,7 @@ The workflow consists of four roles that communicate through mail files in `~/.c
 1. **PLANNER** (`scripts/cc-planner-session.sh`): Creates an implementation plan. Extracts plan file path when idle and writes to `.EXECUTOR.mail`.
 2. **EXECUTOR** (`scripts/cc-executor-session.sh`): Implements the plan using `/ralph-loop:ralph-loop`. Outputs `READY_FOR_REVIEW` when done. Handles gap-fix iterations from REVIEWER.
 3. **REVIEWER** (`scripts/cc-reviewer-session.sh`): Reviews implementation for gaps using `/reviewer-review-impl-gaps`. Either outputs a gaps plan path or `REVIEWER_APPROVED`.
-4. **JANITOR** (`scripts/cc-janitor-session.sh`): Runs `git-commit-generate`, `git push`, and terminates all workflow sessions.
+4. **JANITOR** (`scripts/cc-janitor-session.sh`): Runs `$AUTOCODE_CMD_JANITOR` (default: `claude`), `$AUTOCODE_CMD_GIT push` (default: `git push`), cleans up state files, and terminates all workflow sessions.
 
 ### Tmux Session Naming
 
@@ -127,9 +127,9 @@ List sessions: `tmux ls`
 
 - **tmux**: Session management
 - **flock** (from `util-linux`): Concurrency protection for cron runs
+- **realpath** (from `coreutils`): Resolves absolute repo paths for session naming
 - **claude**: Claude Code CLI (used within sessions for `/ralph-loop`, `/planner-*`, `/reviewer-*`)
-- **git-commit-generate**: Auto-commit skill (used by JANITOR)
-- **git**: Version control
+- **git**: Version control (configurable via `AUTOCODE_CMD_GIT`)
 - **node/npm** (optional): For `npx` support and global install via `npm link`
 
 ## Role Documentation
@@ -144,19 +144,21 @@ Each role has detailed documentation in the repository root:
 
 ### Per-Role Claude Commands
 
-Edit `~/.claude-auto-code/config` (created by `make configure`) to set the Claude command for each role:
+Edit `~/.claude-auto-code/config` (created by `make configure`) to set the command for each role:
 
 ```bash
-AUTOCODE_CMD_PLANNER=claude-opus
-AUTOCODE_CMD_EXECUTOR=claude-sonnet
-AUTOCODE_CMD_REVIEWER=claude-sonnet
+AUTOCODE_CMD_PLANNER=claude
+AUTOCODE_CMD_EXECUTOR=claude
+AUTOCODE_CMD_REVIEWER=claude
+AUTOCODE_CMD_JANITOR=claude
+AUTOCODE_CMD_GIT=git
 ```
 
 Resolution order (highest priority first):
 
 1. Environment variable (e.g., `AUTOCODE_CMD_PLANNER=claude-opus autocode run`)
 2. `~/.claude-auto-code/config`
-3. Built-in default (`claude` for Claude roles, `git-commit-generate` for JANITOR)
+3. Built-in default (`claude` for Claude roles, `git` for JANITOR push)
 
 Run `autocode status` to see which commands are currently active for each role.
 

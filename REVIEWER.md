@@ -16,7 +16,7 @@ All state is under `~/.claude-auto-code/`, keyed by the current working director
 Run from the repo (so `pwd` is that repo):
 
 ```cron
-*/5 * * * * cd /path/to/your/repo && /path/to/workspace/skills/claude-auto-code/scripts/cc-reviewer-session.sh
+*/5 * * * * cd /path/to/your/repo && /path/to/autocode-scripts/scripts/cc-reviewer-session.sh
 ```
 
 ## What the script does each run

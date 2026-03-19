@@ -125,7 +125,7 @@ cmd_run() {
 
     while true; do
         sleep "$AUTOCODE_INTERVAL"
-        echo "--- tick $(date '+%H:%M:%S') ---"
+        echo "## It is $(date) ##"
         _tick
 
         if _is_workflow_done; then

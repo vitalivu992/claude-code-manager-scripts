@@ -27,11 +27,13 @@ Run from the repo you want to execute against (so `pwd` is that repo):
 
 If an **EXECUTOR** tmux session exists for this repo:
 
-- Captures the last 10 lines of the EXECUTOR pane.
+- Checks if the session is idle. If still active, exits.
+- If idle, captures the last 50 lines of the EXECUTOR pane.
 - If output contains `READY_FOR_REVIEW`:
   - Reads the saved plan file path from `<session_name>.EXECUTOR.plan`.
   - Writes that path to `<session_name>.REVIEWER.mail` so the REVIEWER picks it up.
-- Exits. Does not start or poke the session further.
+  - Sends `/exit` to the EXECUTOR session and kills it to prevent re-detection.
+- Exits.
 
 ### 2. No session + no mail → idle exit
 
@@ -95,7 +97,7 @@ First time the EXECUTOR receives a task:
 
 1. **First run after PLANNER writes mail:** No session → create session, launch `/ralph-loop` with plan. Exit.
 2. **Next runs (executor still working):** Session running, no `READY_FOR_REVIEW` in output → print status, exit.
-3. **Run after executor outputs `READY_FOR_REVIEW`:** Session running, `READY_FOR_REVIEW` found → write plan path to `.REVIEWER.mail`. Exit.
+3. **Run after executor outputs `READY_FOR_REVIEW`:** Session idle, `READY_FOR_REVIEW` found → write plan path to `.REVIEWER.mail`, send `/exit`, kill EXECUTOR session. Exit.
 4. **After REVIEWER sends gaps plan:** No session (previous finished), mail has gaps path → interrupt, re-launch with gap-fix context. Exit.
 5. **After REVIEWER approves:** No session, mail has `REVIEWER_APPROVED` → forward to `.JANITOR.mail`. Exit.
 

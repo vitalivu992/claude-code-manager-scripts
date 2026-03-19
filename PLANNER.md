@@ -37,9 +37,9 @@ If there is **no** PLANNER session for this repo:
 
 - Creates a detached tmux session named `<repo-base>-PLANNER` (e.g. `home-ltvu-myproject-PLANNER`).
 - Enters the planning session:
-  - If `~/.ai-coding-team/<session_name>.PLANNER.mail` exists: runs  
-    `claude-zaiglm /plan-create-plan <contents of .PLANNER.mail>`.
-  - Otherwise: runs `claude-zaiglm /plan-auto-plan`.
+  - If `~/.ai-coding-team/<base_name>.PLANNER.mail` exists: runs  
+    `claude-zaiglm /planner-create-plan <contents of .PLANNER.mail>`.
+  - Otherwise: runs `claude-zaiglm /planner-auto-plan`.
 - Captures and prints the last 10 lines of the PLANNER pane.
 - Exits. The planner keeps running in tmux; the next cron run will see the session.
 
@@ -62,14 +62,14 @@ If a PLANNER session **does** exist:
 
 | File | Purpose |
 |------|--------|
-| `<session_name>.PLANNER.mail` | Optional. If present when starting the planner, its contents are passed to `/plan-create-plan` as requirements. |
-| `<session_name>.EXECUTOR.mail` | Written when planner is idle; format is `<base>-PLANNER.EXECUTOR.mail`; contains the plan file path (e.g. `~/.claude/plans/sequential-imagining-cosmos.md`) for the EXECUTOR. |
+| `<base_name>.PLANNER.mail` | Optional. If present when starting the planner, its contents are passed to `/planner-create-plan` as requirements. |
+| `<base_name>-PLANNER.EXECUTOR.mail` | Written when planner is idle; contains the plan file path (e.g. `~/.claude/plans/sequential-imagining-cosmos.md`) for the EXECUTOR. |
 
 ## End-to-end flow with cron every 5 minutes
 
-1. **First run:** No PLANNER → create session, run `/plan-auto-plan` or `/plan-create-plan` (if `.PLANNER.mail` exists). Exit.
+1. **First run:** No PLANNER → create session, run `/planner-auto-plan` or `/planner-create-plan` (if `.PLANNER.mail` exists). Exit.
 2. **Next runs (planner still working):** PLANNER exists, log differs from previous → “PLANNER session is running”, exit.
-3. **Run after planner finishes:** PLANNER exists, log unchanged → “PLANNER session is idle/stopped”, extract plan path, write to `.EXECUTOR.mail`, exit.
+3. **Run after planner finishes:** PLANNER exists, log unchanged → “PLANNER session is idle/stopped”, extract plan path, write to `.EXECUTOR.mail`, kill PLANNER session, exit.
 4. **Later:** If EXECUTOR (or REVIEWER/JANITOR) is up, script exits at the guard step and does not create or poke the PLANNER.
 
 So the planner is started or continued by cron; when it goes idle, the script automatically hands the plan path to the EXECUTOR via `.EXECUTOR.mail`.
@@ -77,8 +77,8 @@ So the planner is started or continued by cron; when it goes idle, the script au
 ## Dependencies
 
 - **tmux:** session creation and pane capture.
-- **tmux-session.sh:** provides `get_base_name`, `get_session_name`, `create_session`, `send_command`, `capture_last_lines`.
-- **claude-zaiglm:** used inside the PLANNER session for `/plan-create-plan` and `/plan-auto-plan` (must be available in the environment of the tmux session, i.e. when cron runs the script from the repo).
+- **tmux-session.sh:** provides `get_base_name`, `get_session_name`, `create_session`, `send_command`, `capture_last_lines`, `is_session_idle`.
+- **claude-zaiglm:** used inside the PLANNER session for `/planner-create-plan` and `/planner-auto-plan` (must be available in the environment of the tmux session, i.e. when cron runs the script from the repo).
 
 ## Attaching to the PLANNER
 

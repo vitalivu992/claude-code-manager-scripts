@@ -25,11 +25,12 @@ Run from the repo (so `pwd` is that repo):
 
 If a **REVIEWER** tmux session exists for this repo:
 
-- Captures the last 10 lines of the REVIEWER pane.
+- Checks if the session is idle. If still active, exits.
+- If idle, captures the last 50 lines of the REVIEWER pane.
 - Checks output (in order):
-  - **Gaps plan found** (`~/.claude/plans/` path detected): writes that path to `<session_name>.EXECUTOR.mail` so the EXECUTOR picks up the gap-fix task.
-  - **`REVIEWER_APPROVED` found**: writes `REVIEWER_APPROVED` to `<session_name>.EXECUTOR.mail`.
-- Exits. Does not start or poke the session further.
+  - **`REVIEWER_APPROVED` found**: writes `REVIEWER_APPROVED` to `<session_name>.EXECUTOR.mail`. Sends `/exit` and kills the session.
+  - **Gaps plan found** (`~/.claude/plans/` path detected): writes that path to `<session_name>.EXECUTOR.mail` so the EXECUTOR picks up the gap-fix task. Sends `/exit` and kills the session.
+- Exits.
 
 ### 2. No session + no mail → idle exit
 
@@ -71,11 +72,11 @@ The `/reviewer-review-impl-gaps` command will produce one of two outcomes, detec
 
 1. **First run after EXECUTOR writes mail:** No session → create session, launch `/reviewer-review-impl-gaps`. Exit.
 2. **Next runs (reviewer still working):** Session running, no decision yet in output → print status, exit.
-3. **Run after reviewer outputs gaps plan:** Session running, `~/.claude/plans/` path found → write gaps path to `.EXECUTOR.mail`. Exit.
-4. **Run after reviewer outputs `REVIEWER_APPROVED`:** Session running, `REVIEWER_APPROVED` found → write `REVIEWER_APPROVED` to `.EXECUTOR.mail`. Exit.
+3. **Run after reviewer outputs gaps plan:** Session idle, `~/.claude/plans/` path found → write gaps path to `.EXECUTOR.mail`, send `/exit`, kill REVIEWER session. Exit.
+4. **Run after reviewer outputs `REVIEWER_APPROVED`:** Session idle, `REVIEWER_APPROVED` found → write `REVIEWER_APPROVED` to `.EXECUTOR.mail`, send `/exit`, kill REVIEWER session. Exit.
 
 ## Dependencies
 
 - **tmux:** session creation and pane capture.
-- **tmux-session.sh:** provides `get_base_name`, `create_session`, `send_command`.
+- **tmux-session.sh:** provides `get_base_name`, `create_session`, `send_command`, `is_session_idle`.
 - **claude-zaiglm:** used inside the REVIEWER session for `/reviewer-review-impl-gaps`.

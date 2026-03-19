@@ -31,8 +31,8 @@ If the mail exists but does not contain `REVIEWER_APPROVED`, the script logs the
 When the EXECUTOR writes `REVIEWER_APPROVED` to the mail box:
 
 1. Creates the JANITOR tmux session.
-2. Sends `git-commit-generate` to the JANITOR session (auto-generates a commit message and commits staged changes).
-3. Sends `git push` to the JANITOR session.
+2. Sends `git-commit-generate` to the JANITOR session and waits for it to complete (polls until idle).
+3. Sends `git push` to the JANITOR session and waits for it to complete (polls until idle).
 4. Removes the JANITOR mail.
 5. Iterates over all four roles — PLANNER, EXECUTOR, REVIEWER, JANITOR — and kills each tmux session that still exists.
 
@@ -56,6 +56,6 @@ After step 5, no workflow tmux sessions remain and the repo has been committed a
 ## Dependencies
 
 - **tmux:** session creation and key sending.
-- **tmux-session.sh:** provides `get_base_name`, `create_session`, `send_command`.
+- **tmux-session.sh:** provides `get_base_name`, `create_session`, `send_command`, `is_session_idle`.
 - **git-commit-generate:** generates and commits changes; must be available in the tmux session's `PATH`.
 - **git:** used directly for `git push`.

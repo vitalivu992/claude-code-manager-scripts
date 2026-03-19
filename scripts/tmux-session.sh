@@ -107,7 +107,7 @@ create_session() {
     fi
 
     tmux new-session -d -s "$session"
-
+    source ~/.zshrc
     tmux send-keys -t "$session" "cd '$(realpath "$repo_path")'" C-m
     echo "Created session: $session"
 

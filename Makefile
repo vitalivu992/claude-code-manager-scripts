@@ -75,10 +75,13 @@ test: ## Run all tests
 	@bash tests/test_retry.sh
 	@printf "\n$(GREEN)All test suites passed.$(RESET)\n"
 
-install: ## Symlink bin/autocode into ~/.local/bin
+install: ## Symlink bin/autocode into ~/.local/bin and copy commands to ~/.claude/commands/
 	@mkdir -p "$(INSTALL_DIR)"
 	@ln -sf "$(BIN)" "$(INSTALL_DIR)/autocode"
 	@printf "  $(OK) Symlinked $(BIN) -> $(INSTALL_DIR)/autocode\n"
+	@mkdir -p "$(COMMANDS_DIR)"
+	@cp -u commands/*.md "$(COMMANDS_DIR)/"
+	@printf "  $(OK) Copied commands to $(COMMANDS_DIR)\n"
 	@if echo "$$PATH" | grep -q "$(INSTALL_DIR)"; then \
 		printf "  $(OK) $(INSTALL_DIR) is already in PATH\n"; \
 	else \

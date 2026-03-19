@@ -1,3 +1,4 @@
+SHELL         := /bin/bash
 .DEFAULT_GOAL := help
 
 INSTALL_DIR   ?= $(HOME)/.local/bin

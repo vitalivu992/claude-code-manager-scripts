@@ -1,82 +1,80 @@
 # Reviewer workflow (cc-reviewer-session.sh)
 
-This describes how the reviewer works when you run `scripts/cc-reviewer-session.sh` every 5 minutes via cron.
+This describes how the reviewer works when you run `scripts/cc-reviewer-session.sh` via cron or `autocode run`.
 
 ## Overview
 
-The script drives a **REVIEWER** tmux session that checks the EXECUTOR's implementation for gaps. It is designed to be run repeatedly by cron so that:
+The script drives a **REVIEWER** tmux session that checks the EXECUTOR's implementation for gaps. It is designed to be run repeatedly so that:
 
-1. If the REVIEWER session is already running, the script polls its output for a decision: either a gaps plan file path or the literal text `REVIEWER_APPROVED`.
-2. If no session is running, the script reads the mail box and starts a review when the EXECUTOR has signalled `READY_FOR_REVIEW`.
+1. If the REVIEWER session is running (state `reviewer:active`), the script polls output for either a gaps plan file path or the literal text `REVIEWER_APPROVED`.
+2. If the executor is done (state `executor:done`), the script starts a review.
 
-All state is under `~/.claude-auto-code/`, keyed by the current working directory (repo path) when the script runs.
+All state is under `~/.claude-auto-code/`, keyed by the current working directory (repo path).
 
-## Cron setup
+## State-Based Guards
 
-Run from the repo (so `pwd` is that repo):
+The REVIEWER script only runs when:
+- State is **`executor:done`** — start review
+- State is **`reviewer:active`** — check review output
 
-```cron
-*/5 * * * * cd /path/to/your/repo && /path/to/autocode-scripts/scripts/cc-reviewer-session.sh
-```
+For all other states, the script exits immediately.
+
+## Concurrency
+
+The script uses a shared flock (`${base_name}.lock`) shared by all roles.
 
 ## What the script does each run
 
-### 1. REVIEWER session is running → check output
+### 1. State is `reviewer:active` → check output
 
-If a **REVIEWER** tmux session exists for this repo:
-
+- Verifies the REVIEWER tmux session still exists.
 - Checks if the session is idle. If still active, exits.
-- If idle, captures the last 50 lines of the REVIEWER pane.
+- If idle, captures the last 30 lines of the REVIEWER pane.
 - Checks output (in order):
-  - **`REVIEWER_APPROVED` found**: writes `REVIEWER_APPROVED` to `<session_name>.EXECUTOR.mail`. Sends `/exit` and kills the session.
-  - **Gaps plan found** (`~/.claude/plans/` path detected): writes that path to `<session_name>.EXECUTOR.mail` so the EXECUTOR picks up the gap-fix task. Sends `/exit` and kills the session.
+  - **`REVIEWER_APPROVED` found**: writes state `reviewer:approved`. Sends `/exit` and kills the session.
+  - **Gaps plan found** (`~/.claude/plans/` path detected, different from the original plan): writes `gaps_path` to metadata, writes state `reviewer:gaps`. Sends `/exit` and kills the session.
 - Exits.
 
-### 2. No session + no mail → idle exit
+### 2. State is `executor:done` → start review
 
-If there is no REVIEWER session and no `<session_name>.REVIEWER.mail` file, the script exits silently.
-
-### 3. No session + mail present → start review
-
-When the EXECUTOR writes the plan path to the mail box (after outputting `READY_FOR_REVIEW`):
-
-- Reads the plan file path from `<session_name>.REVIEWER.mail`.
+- Reads `plan_path` from metadata.
 - Creates the REVIEWER tmux session.
 - Sends the review command:
   ```
   claude /reviewer-review-impl-gaps <PLAN_FILE_PATH>
   ```
-- Removes the REVIEWER mail.
-- Exits. The reviewer runs in tmux; subsequent cron runs will see the session and poll its output.
+- Writes state `reviewer:active`.
+- Exits. The reviewer runs in tmux; subsequent runs will see the session and poll its output.
 
 ## What the REVIEWER outputs
 
 The `/reviewer-review-impl-gaps` command will produce one of two outcomes, detectable in the pane output:
 
-| Output | Meaning | Next action |
-|--------|---------|-------------|
-| A `~/.claude/plans/` file path | Gaps were found; a new plan describes what to fix | Script writes that path to `.EXECUTOR.mail` |
-| `REVIEWER_APPROVED` | Implementation is complete and correct | Script writes `REVIEWER_APPROVED` to `.EXECUTOR.mail` |
+| Output | Meaning | State Transition |
+|--------|---------|-----------------|
+| A `~/.claude/plans/` file path | Gaps were found; a new plan describes what to fix | `reviewer:gaps` |
+| `REVIEWER_APPROVED` | Implementation is complete and correct | `reviewer:approved` |
 
 ## Data directory and files
 
-- **Directory:** `~/.claude-auto-code/` (script uses `mkdir -p`).
+- **Directory:** `~/.claude-auto-code/`
 - **Session base name:** from `get_base_name $(pwd)` in `tmux-session.sh`.
 
 | File | Purpose |
 |------|---------|
-| `<base>-EXECUTOR.REVIEWER.mail` | Inbound mail from EXECUTOR. Contains the plan file path after `READY_FOR_REVIEW`. Deleted after processing. |
-| `<base>-REVIEWER.EXECUTOR.mail` | Written by this script with either a gaps plan path or `REVIEWER_APPROVED`; consumed by the EXECUTOR. |
+| `<base>.lock` | Shared flock for all roles |
+| `<base>.state` | Workflow state (reads `executor:done`, writes `reviewer:active`/`reviewer:approved`/`reviewer:gaps`) |
+| `<base>.meta` | Reads: `plan_path`. Writes: `gaps_path`, `updated_at` |
 
-## End-to-end flow with cron every 5 minutes
+## End-to-end flow
 
-1. **First run after EXECUTOR writes mail:** No session → create session, launch `/reviewer-review-impl-gaps`. Exit.
-2. **Next runs (reviewer still working):** Session running, no decision yet in output → print status, exit.
-3. **Run after reviewer outputs gaps plan:** Session idle, `~/.claude/plans/` path found → write gaps path to `.EXECUTOR.mail`, send `/exit`, kill REVIEWER session. Exit.
-4. **Run after reviewer outputs `REVIEWER_APPROVED`:** Session idle, `REVIEWER_APPROVED` found → write `REVIEWER_APPROVED` to `.EXECUTOR.mail`, send `/exit`, kill REVIEWER session. Exit.
+1. **First run after EXECUTOR writes `executor:done`:** State is `executor:done` → create session, launch `/reviewer-review-impl-gaps`, write state `reviewer:active`. Exit.
+2. **Next runs (reviewer still working):** State is `reviewer:active`, session active → exit.
+3. **Run after reviewer outputs gaps plan:** State is `reviewer:active`, session idle, `~/.claude/plans/` path found → write `gaps_path` to metadata, write state `reviewer:gaps`, kill session. Exit.
+4. **Run after reviewer outputs `REVIEWER_APPROVED`:** State is `reviewer:active`, session idle, `REVIEWER_APPROVED` found → write state `reviewer:approved`, kill session. Exit.
 
 ## Dependencies
 
 - **tmux:** session creation and pane capture.
-- **tmux-session.sh:** provides `get_base_name`, `create_session`, `send_command`, `is_session_idle`.
+- **tmux-session.sh:** provides `get_base_name`, `create_session`, `send_command`, `is_session_idle`, `capture_last_lines`, `read_state`, `write_state`, `read_meta`, `write_meta`.
 - **claude:** used inside the REVIEWER session for `/reviewer-review-impl-gaps`.

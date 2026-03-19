@@ -1,60 +1,70 @@
 # Janitor workflow (cc-janitor-session.sh)
 
-This describes how the janitor works when you run `scripts/cc-janitor-session.sh` every 5 minutes via cron.
+This describes how the janitor works when you run `scripts/cc-janitor-session.sh` via cron or `autocode run`.
 
 ## Overview
 
-The **JANITOR** is the final stage of the pipeline. It is triggered only once — when the EXECUTOR forwards `REVIEWER_APPROVED`. Its job is to commit, push, and terminate all workflow sessions, leaving the repo in a clean state.
+The **JANITOR** is the final stage of the pipeline. It is triggered when the REVIEWER approves the implementation (state `reviewer:approved`). Its job is to commit, push, and terminate all workflow sessions, leaving the repo in a clean state.
 
-All state is under `~/.claude-auto-code/`, keyed by the current working directory (repo path) when the script runs.
+All state is under `~/.claude-auto-code/`, keyed by the current working directory (repo path).
 
-## Cron setup
+## State-Based Guards
 
-Run from the repo (so `pwd` is that repo):
+The JANITOR script only runs when:
+- State is **`reviewer:approved`** — start commit
+- State is **`janitor:commit`** — check if commit is done, start push
+- State is **`janitor:push`** — check if push is done, clean up
 
-```cron
-*/5 * * * * cd /path/to/your/repo && /path/to/autocode-scripts/scripts/cc-janitor-session.sh
-```
+For all other states, the script exits immediately.
+
+## Concurrency
+
+The script uses a shared flock (`${base_name}.lock`) shared by all roles.
 
 ## What the script does each run
 
-### 1. No mail → idle exit
+### 1. State is `reviewer:approved` → start commit
 
-If `<session_name>.JANITOR.mail` does not exist, the script exits silently. Nothing to do.
+- Creates the JANITOR tmux session.
+- Sends `$AUTOCODE_CMD_JANITOR -p "/git-commit"` (default: `claude -p "/git-commit"`).
+- Writes state `janitor:commit`.
 
-### 2. Mail present but not `REVIEWER_APPROVED` → error exit
+### 2. State is `janitor:commit` → check commit, start push
 
-If the mail exists but does not contain `REVIEWER_APPROVED`, the script logs the unexpected content, removes the mail, and exits with code 1.
+- Verifies the JANITOR session exists and is idle.
+- Sends `$AUTOCODE_CMD_GIT push` (default: `git push`).
+- Writes state `janitor:push`.
 
-### 3. Mail contains `REVIEWER_APPROVED` → commit, push, clean up
+### 3. State is `janitor:push` → check push, clean up
 
-When the EXECUTOR writes `REVIEWER_APPROVED` to the mail box:
+- Verifies the JANITOR session exists and is idle.
+- Clears the state file and metadata file.
+- Removes the lock file.
+- Kills all four role tmux sessions (PLANNER, EXECUTOR, REVIEWER, JANITOR).
 
-1. Creates the JANITOR tmux session.
-2. Sends `$AUTOCODE_CMD_JANITOR -p /git-commit` (default: `claude -p /git-commit`) and waits for it to complete (polls until idle).
-3. Sends `$AUTOCODE_CMD_GIT push` (default: `git push`) and waits for it to complete (polls until idle).
-4. Removes the JANITOR mail, the persistent `.EXECUTOR.plan` file, and all role lock files.
-5. Iterates over all four roles — PLANNER, EXECUTOR, REVIEWER, JANITOR — and kills each tmux session that still exists.
-
-After step 5, no workflow tmux sessions remain, state files are cleaned up, and the repo has been committed and pushed.
+After cleanup, no workflow sessions remain, all state files are removed, and the repo has been committed and pushed.
 
 ## Data directory and files
 
-- **Directory:** `~/.claude-auto-code/` (script uses `mkdir -p`).
+- **Directory:** `~/.claude-auto-code/`
 - **Session base name:** from `get_base_name $(pwd)` in `tmux-session.sh`.
 
 | File | Purpose |
 |------|---------|
-| `<base>-EXECUTOR.JANITOR.mail` | Inbound mail from EXECUTOR. Contains `REVIEWER_APPROVED`. Deleted after processing. |
+| `<base>.lock` | Shared flock for all roles (removed during cleanup) |
+| `<base>.state` | Workflow state (reads `reviewer:approved`, writes `janitor:commit`/`janitor:push`, cleared at end) |
+| `<base>.meta` | Metadata (cleared during cleanup) |
 
-## End-to-end flow with cron every 5 minutes
+## End-to-end flow
 
-1. **Runs before approval:** No mail → exit.
-2. **First run after EXECUTOR writes mail:** Mail contains `REVIEWER_APPROVED` → create session, commit, push, clean up state files, kill all sessions. Exit.
-3. **Subsequent runs:** No mail (already deleted) → exit.
+1. **Runs before approval:** State is not `reviewer:approved`/`janitor:*` → exit.
+2. **First run after REVIEWER approves:** State is `reviewer:approved` → create session, start commit, write state `janitor:commit`. Exit.
+3. **Run after commit completes:** State is `janitor:commit`, session idle → start push, write state `janitor:push`. Exit.
+4. **Run after push completes:** State is `janitor:push`, session idle → clean up all state, kill all sessions. Exit.
+5. **Subsequent runs:** State is empty (cleaned up) → exit.
 
 ## Dependencies
 
 - **tmux:** session creation and key sending.
-- **tmux-session.sh:** provides `get_base_name`, `create_session`, `send_command`, `is_session_idle`.
+- **tmux-session.sh:** provides `get_base_name`, `create_session`, `send_command`, `is_session_idle`, `capture_last_lines`, `read_state`, `write_state`, `clear_state`, `clear_meta`.
 - **git:** used for `git push` (configurable via `AUTOCODE_CMD_GIT`).

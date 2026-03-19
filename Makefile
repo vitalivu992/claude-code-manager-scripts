@@ -46,7 +46,7 @@ check: ## Check all required and optional dependencies
 	_check git           "git"               "apt install git"; \
 	_check realpath      "realpath (coreutils)" "apt install coreutils"; \
 	_check claude "claude"     "install Claude Code CLI and add alias"; \
-	_check git-commit-generate "git-commit-generate" "create the alias for this command"
+	_check git "git" "apt install git"
 	@printf "\n$(BOLD)Optional dependencies$(RESET)\n"
 	@_checkopt() { \
 		cmd="$$1"; label="$$2"; hint="$$3"; \
@@ -72,13 +72,7 @@ configure: ## Create directories and install Claude Code commands
 	else \
 		printf "  $(YELLOW)~$(RESET) $(DATADIR)/config already exists, skipping\n"; \
 	fi
-	@if command -v npm >/dev/null 2>&1; then \
-		npm link --quiet; \
-		printf "  $(OK) npm link complete — 'autocode' is now in PATH\n"; \
-	else \
-		printf "  $(YELLOW)~$(RESET) npm not found; run 'make install' to add autocode to PATH manually\n"; \
-	fi
-	@printf "\n$(GREEN)Done!$(RESET) Run 'autocode help' to get started.\n"
+	@printf "\n$(GREEN)Done!$(RESET) Run 'make install' then 'autocode help' to get started.\n"
 
 install: ## Symlink bin/autocode into ~/.local/bin (no npm required)
 	@mkdir -p "$(INSTALL_DIR)"

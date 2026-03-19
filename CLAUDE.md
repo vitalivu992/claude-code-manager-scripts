@@ -59,17 +59,15 @@ This reports which required and optional tools are available and which are missi
 make configure
 ```
 
-Creates `~/.claude-auto-code/`, copies Claude Code commands to `~/.claude/commands/`, and links the CLI globally if npm is available.
+Creates `~/.claude-auto-code/`, copies Claude Code commands to `~/.claude/commands/`, and creates a default config file.
 
 ### 3. Install the CLI
 
 ```bash
 make install        # symlinks bin/autocode to ~/.local/bin/autocode
-# or
-npm link            # installs via npm (requires node)
 ```
 
-Ensure `~/.local/bin` (or your npm bin path) is on `$PATH`.
+Ensure `~/.local/bin` is on `$PATH`.
 
 ## Running the Workflow
 
@@ -92,13 +90,6 @@ autocode stop
 ```
 
 `autocode run` polls all four role scripts every 30 seconds (configurable via `AUTOCODE_INTERVAL`). It exits automatically once JANITOR finishes.
-
-#### Without installing (via npx)
-
-```bash
-npx autocode-scripts plan "Add user authentication with OAuth"
-npx autocode-scripts run
-```
 
 ### Using cron (advanced)
 

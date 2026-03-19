@@ -7,9 +7,21 @@ datadir="$HOME/.claude-auto-code"
 mkdir -p "$datadir"
 base_name=$(get_base_name)
 
+current_state=$(read_state)
+case "$current_state" in
+    planner:done|executor:active|reviewer:gaps) ;;
+    *) echo "Not EXECUTOR's turn (state: $current_state)"; exit 0 ;;
+esac
+
 LOCK_FILE="$datadir/${base_name}.lock"
-exec 200>"$LOCK_FILE"
-flock -n 200 || { echo "🔒 Another role is running, exiting EXECUTOR"; exit 0; }
+if [ "${_AUTOCODE_LOCKED:-}" != "1" ]; then
+    export _AUTOCODE_LOCKED=1
+    flock -n -E 200 "$LOCK_FILE" "$0" "$@"
+    rc=$?
+    [ $rc -eq 200 ] && echo "🔒 Another role is running, exiting EXECUTOR" && exit 0
+    exit $rc
+fi
+unset _AUTOCODE_LOCKED
 
 current_state=$(read_state)
 case "$current_state" in

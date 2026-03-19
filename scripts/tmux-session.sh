@@ -65,6 +65,29 @@ load_config() {
     AUTOCODE_CMD_GIT="${AUTOCODE_CMD_GIT:-git}"
 }
 
+acquire_role_lock() {
+    local role="$1"
+    local base_name="$2"
+    local datadir="$HOME/.claude-auto-code"
+    AUTOCODE_LOCK_DIR="$datadir/${base_name}.lockdir"
+
+    if ! mkdir "$AUTOCODE_LOCK_DIR" 2>/dev/null; then
+        local lockpid
+        lockpid=$(cat "$AUTOCODE_LOCK_DIR/pid" 2>/dev/null)
+        if [ -n "$lockpid" ] && kill -0 "$lockpid" 2>/dev/null; then
+            echo "🔒 Another role is running (pid $lockpid), exiting $role"
+            return 1
+        fi
+        rm -rf "$AUTOCODE_LOCK_DIR"
+        if ! mkdir "$AUTOCODE_LOCK_DIR" 2>/dev/null; then
+            echo "🔒 Lock race, exiting $role"
+            return 1
+        fi
+    fi
+    echo $$ > "$AUTOCODE_LOCK_DIR/pid"
+    trap 'rm -rf "$AUTOCODE_LOCK_DIR"' EXIT
+    return 0
+}
 
 # ----------------------------------------------------------------------------
 # Helper: clean path → session base name (replace / with - exactly as you asked)
@@ -106,7 +129,10 @@ create_session() {
         return 0
     fi
 
-    tmux new-session -d -s "$session" -l
+    if ! tmux new-session -d -s "$session" "${SHELL:-/usr/bin/zsh} -l" 2>/dev/null; then
+        echo "❌ tmux new-session failed for $session"
+        return 1
+    fi
     tmux send-keys -t "$session" "cd '$(realpath "$repo_path")'" C-m
     echo "Created session: $session"
 
@@ -187,11 +213,11 @@ is_session_idle() {
     if [ "$snap1" = "$snap2" ]; then
         return 0
     else
-        echo "💜 Session $session is still active------------------------------------"
+        echo "💜 Session $session is still active"
         echo "#####"
         snaplength=$(echo "$snap2" | wc -l)
-        echo "$snap2" | head -n "$((snaplength -5))"|tail -n 10
-        echo "------------------------------------------------------------------------"
+        echo "$snap2" | tail -n 10 | sed 's/^/> /'
+        echo ""
         return 1
     fi
 }

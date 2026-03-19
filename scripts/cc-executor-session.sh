@@ -26,7 +26,7 @@ if tmux has-session -t "$session_name" 2>/dev/null; then
     echo "💤 EXECUTOR session is idle, checking output"
     output=$(tmux capture-pane -S -50 -p -t "$session_name" 2>/dev/null)
     echo "$output"
-    if echo "$output" | grep -q "READY_FOR_REVIEW"; then
+    if echo "$output" | grep -qE '^\s*READY_FOR_REVIEW\s*$'; then
         plan_file_path=$(cat "$executor_plan" 2>/dev/null)
         if [ -n "$plan_file_path" ]; then
             echo "📬 READY_FOR_REVIEW detected, writing to REVIEWER mail"
@@ -61,7 +61,9 @@ if [ -f "$reviewer_mail" ]; then
         fi
 
         create_session "EXECUTOR"
-        send_command "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR /ralph-loop:ralph-loop \"review the code changes, existing source code, documents and the plan $plan_file_path and the gaps documented and plan in $plan_gaps_file_path, review if the gaps are valid or not, then fix the necessary gaps, make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""
+        send_command "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR"
+        sleep 10
+        send_command "EXECUTOR" "/ralph-loop:ralph-loop \"review the code changes, existing source code, documents and the plan $plan_file_path and the gaps documented and plan in $plan_gaps_file_path, review if the gaps are valid or not, then fix the necessary gaps, make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""
         rm -f "$reviewer_mail"
         exit 0
     fi
@@ -82,7 +84,9 @@ if [ -f "$planner_mail" ]; then
     echo "$plan_file_path" > "$executor_plan"
 
     create_session "EXECUTOR"
-    send_command "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR /ralph-loop:ralph-loop \"review existing source code, documents and execute the plan $plan_file_path, make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""
+    send_command "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR"
+    sleep 10
+    send_command "EXECUTOR" "/ralph-loop:ralph-loop \"review existing source code, documents and execute the plan $plan_file_path, make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""
     rm -f "$planner_mail"
     exit 0
 fi

@@ -11,11 +11,6 @@ get_base_name() {
     realpath "$repo_path" 2>/dev/null | tr '/' '-' | sed 's/^-//'
 }
 
-datadir="~/.ai-coding-team"
-mkdir -p $datadir
-current_dir=$(pwd)
-
-
 get_session_name() {
     local role="${1:-EXECUTOR}"
     local repo_path="${2:-$(pwd)}"
@@ -68,7 +63,7 @@ send_command() {
 
     if ! tmux has-session -t "$session" 2>/dev/null; then
         echo "❌ Session $session does not exist"
-        create_repo_sessions "$role" "$repo_path"
+        create_session "$role" "$repo_path"
         if ! tmux has-session -t "$session" 2>/dev/null; then
             echo "❌ Failed to create session $session after retry"
             return 1

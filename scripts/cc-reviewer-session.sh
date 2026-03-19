@@ -35,7 +35,17 @@ if [ "$current_state" = "reviewer:active" ]; then
     fi
 
     echo "💤 REVIEWER session is idle, checking output"
-    output=$(capture_last_lines "REVIEWER" 30)
+    output=$(capture_last_lines "REVIEWER" 50)
+    echo "$output"|sed 's/^/>>> /'
+
+    if echo "$output" | grep -qE '^\s*REVIEWER_APPROVED\s*$'; then
+        echo "📬 REVIEWER_APPROVED detected"
+        write_state "reviewer:approved"
+        write_meta "updated_at" "$(date -Iseconds)"
+        send_command "REVIEWER" "/exit"
+        tmux kill-session -t "$session_name" 2>/dev/null
+        exit 0
+    fi
 
     plan_file_path=$(read_meta "plan_path")
     plan_gaps_path=$(echo "$output" | grep "~/.claude/plans/" | awk '{print $NF}' | tail -1)
@@ -43,13 +53,7 @@ if [ "$current_state" = "reviewer:active" ]; then
         echo "💤 Plan gap files was not created, waiting for the next round"
         exit 0
     fi
-    if echo "$output" | grep -qE '^\s*REVIEWER_APPROVED\s*$'; then
-        echo "📬 REVIEWER_APPROVED detected"
-        write_state "reviewer:approved"
-        write_meta "updated_at" "$(date -Iseconds)"
-        send_command "REVIEWER" "/exit"
-        tmux kill-session -t "$session_name" 2>/dev/null
-    elif [ -n "$plan_gaps_path" ]; then
+    if [ -n "$plan_gaps_path" ]; then
         echo "📬 Plan gaps file detected: $plan_gaps_path"
         write_meta "gaps_path" "$plan_gaps_path"
         write_state "reviewer:gaps"

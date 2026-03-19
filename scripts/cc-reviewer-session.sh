@@ -22,11 +22,16 @@ if tmux has-session -t "$session_name" 2>/dev/null; then
     fi
 
     echo "💤 REVIEWER session is idle, checking output"
-    output=$(tmux capture-pane -S -50 -p -t "$session_name" 2>/dev/null)
-    echo "$output"
+    output=$(capture_last_lines "REVIEWER" 30)
 
     plan_gaps_path=$(echo "$output" | grep "~/.claude/plans/" | awk '{print $NF}' | tail -1)
-    if echo "$output" | grep -q "REVIEWER_APPROVED"; then
+    plan_file_path=$(cat "$datadir/${base_name}.EXECUTOR.plan" 2>/dev/null)
+    # must check if plan_gaps_path is not the same as plan_file_path
+    if [ "$plan_gaps_path" == "$plan_file_path" ]; then
+        echo "💤 Plan gap files was not created, waiting for the next round"
+        exit 0
+    fi
+    if echo "$output" | grep -qE '^\s*REVIEWER_APPROVED\s*$'; then
         echo "📬 REVIEWER_APPROVED detected, writing to EXECUTOR mail"
         echo "REVIEWER_APPROVED" > "$datadir/${session_name}.EXECUTOR.mail"
         send_command "REVIEWER" "/exit"

@@ -15,7 +15,7 @@ BOLD   := \033[1m
 OK     := $(GREEN)✔$(RESET)
 MISS   := $(RED)✘$(RESET)
 
-.PHONY: help check configure install test
+.PHONY: help check configure install commands test
 
 help: ## Show this help message
 	@printf "$(BOLD)autocode-scripts$(RESET) — multi-agent AI coding workflow\n\n"

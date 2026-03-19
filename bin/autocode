@@ -40,6 +40,8 @@ cmd_help() {
     printf "  %-30s %s\n" 'AUTOCODE_CMD_PLANNER=<cmd>'  "Claude command for PLANNER role (default: $AUTOCODE_CMD_PLANNER)"
     printf "  %-30s %s\n" 'AUTOCODE_CMD_EXECUTOR=<cmd>' "Claude command for EXECUTOR role (default: $AUTOCODE_CMD_EXECUTOR)"
     printf "  %-30s %s\n" 'AUTOCODE_CMD_REVIEWER=<cmd>' "Claude command for REVIEWER role (default: $AUTOCODE_CMD_REVIEWER)"
+    printf "  %-30s %s\n" 'AUTOCODE_CMD_JANITOR=<cmd>'  "Commit command for JANITOR role (default: $AUTOCODE_CMD_JANITOR)"
+    printf "  %-30s %s\n" 'AUTOCODE_CMD_GIT=<cmd>'      "Git command for JANITOR push (default: $AUTOCODE_CMD_GIT)"
     echo ""
     echo "  Persistent config: ~/.claude-auto-code/config (created by 'make configure')"
     echo ""
@@ -89,7 +91,6 @@ _is_workflow_done() {
 }
 
 _tick() {
-    local repo_path="${1:-$(pwd)}"
     "$SCRIPTS_DIR/cc-planner-session.sh"
     "$SCRIPTS_DIR/cc-executor-session.sh"
     "$SCRIPTS_DIR/cc-reviewer-session.sh"
@@ -115,7 +116,7 @@ cmd_run() {
         echo ""
     fi
 
-    _tick "$(pwd)"
+    _tick
 
     if $once; then
         return 0
@@ -124,7 +125,7 @@ cmd_run() {
     while true; do
         sleep "$AUTOCODE_INTERVAL"
         echo "--- tick $(date '+%H:%M:%S') ---"
-        _tick "$(pwd)"
+        _tick
 
         if _is_workflow_done; then
             echo ""
@@ -146,6 +147,8 @@ cmd_status() {
     printf "  %-10s %s\n" "PLANNER"  "$AUTOCODE_CMD_PLANNER"
     printf "  %-10s %s\n" "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR"
     printf "  %-10s %s\n" "REVIEWER" "$AUTOCODE_CMD_REVIEWER"
+    printf "  %-10s %s\n" "JANITOR"  "$AUTOCODE_CMD_JANITOR"
+    printf "  %-10s %s\n" "GIT"      "$AUTOCODE_CMD_GIT"
     echo ""
 
     _bold "Tmux sessions:"

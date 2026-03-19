@@ -64,10 +64,10 @@ configure: ## Create directories and install Claude Code commands
 	@mkdir -p "$(DATADIR)"
 	@printf "  $(OK) Created $(DATADIR)\n"
 	@mkdir -p "$(COMMANDS_DIR)"
-	@cp commands/*.md "$(COMMANDS_DIR)/"
+	@cp -u commands/*.md "$(COMMANDS_DIR)/"
 	@printf "  $(OK) Copied commands to $(COMMANDS_DIR)\n"
 	@if [ ! -f "$(DATADIR)/config" ]; then \
-		printf '# autocode per-role command configuration\n# Set the CLI command to use for each role.\n# Environment variables take precedence over this file.\n\nAUTOCODE_CMD_PLANNER=claude\nAUTOCODE_CMD_EXECUTOR=claude\nAUTOCODE_CMD_REVIEWER=claude\n' > "$(DATADIR)/config"; \
+		printf '# autocode per-role command configuration\n# Set the CLI command to use for each role.\n# Environment variables take precedence over this file.\n\nAUTOCODE_CMD_PLANNER=claude\nAUTOCODE_CMD_EXECUTOR=claude\nAUTOCODE_CMD_REVIEWER=claude\nAUTOCODE_CMD_JANITOR=claude\nAUTOCODE_CMD_GIT=git\n' > "$(DATADIR)/config"; \
 		printf "  $(OK) Created $(DATADIR)/config\n"; \
 	else \
 		printf "  $(YELLOW)~$(RESET) $(DATADIR)/config already exists, skipping\n"; \

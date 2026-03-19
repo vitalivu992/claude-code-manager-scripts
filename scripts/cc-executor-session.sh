@@ -43,7 +43,7 @@ fi
 if [ -f "$reviewer_mail" ]; then
     mail_content=$(cat "$reviewer_mail")
 
-    if echo "$mail_content" | grep -q "REVIEWER_APPROVED"; then
+    if echo "$mail_content" | grep -qE '^\s*REVIEWER_APPROVED\s*$'; then
         echo "✅ REVIEWER_APPROVED received, forwarding to JANITOR"
         echo "REVIEWER_APPROVED" > "$datadir/${session_name}.JANITOR.mail"
         rm -f "$reviewer_mail"

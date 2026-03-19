@@ -22,7 +22,6 @@ function enter_planning_session() {
     else
         send_command "PLANNER" "$AUTOCODE_CMD_PLANNER /planner-auto-plan"
     fi
-    capture_last_lines "PLANNER" 10
 }
 
 function extract_plan_file_path() {
@@ -35,9 +34,7 @@ for role in "EXECUTOR" "REVIEWER" "JANITOR"; do
     session_name=$(get_session_name "$role")
     if [ -n "$session_name" ]; then
         echo "❌ $role session exists"
-        capture_last_lines "$role" 10
-        echo "---"
-        echo "🔎 to enter the $role session, run tmux attach -t $session_name"
+        echo "  🔎 to enter the $role session, run tmux attach -t $session_name"
         exit 0
     fi
 done

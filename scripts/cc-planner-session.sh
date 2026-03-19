@@ -1,8 +1,9 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source "$SCRIPT_DIR/tmux-session.sh"
+load_config
 
-datadir="$HOME/.ai-coding-team"
+datadir="$HOME/.claude-auto-code"
 mkdir -p "$datadir"
 base_name=$(get_base_name)
 
@@ -14,9 +15,9 @@ function enter_planning_session() {
     echo "Entering the planning session..."
     if [ -f "$datadir/${base_name}.PLANNER.mail" ]; then
         requirements=$(cat "$datadir/${base_name}.PLANNER.mail")
-        send_command "PLANNER" "claude-zaiglm /planner-create-plan $requirements"
+        send_command "PLANNER" "$AUTOCODE_CMD_PLANNER /planner-create-plan $requirements"
     else
-        send_command "PLANNER" "claude-zaiglm /planner-auto-plan"
+        send_command "PLANNER" "$AUTOCODE_CMD_PLANNER /planner-auto-plan"
     fi
     capture_last_lines "PLANNER" 10
 }

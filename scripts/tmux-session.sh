@@ -1,6 +1,14 @@
 #!/bin/bash
 # Hands-on tmux scripting for your repo workflow (PLANNER / EXECUTOR / REVIEWER)
 
+load_config() {
+    local config_file="$HOME/.claude-auto-code/config"
+    [ -f "$config_file" ] && source "$config_file"
+    AUTOCODE_CMD_PLANNER="${AUTOCODE_CMD_PLANNER:-claude}"
+    AUTOCODE_CMD_EXECUTOR="${AUTOCODE_CMD_EXECUTOR:-claude}"
+    AUTOCODE_CMD_REVIEWER="${AUTOCODE_CMD_REVIEWER:-claude}"
+}
+
 
 # ----------------------------------------------------------------------------
 # Helper: clean path → session base name (replace / with - exactly as you asked)

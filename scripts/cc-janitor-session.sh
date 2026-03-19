@@ -1,8 +1,9 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source "$SCRIPT_DIR/tmux-session.sh"
+load_config
 
-datadir="$HOME/.ai-coding-team"
+datadir="$HOME/.claude-auto-code"
 mkdir -p "$datadir"
 base_name=$(get_base_name)
 session_name="${base_name}-JANITOR"
@@ -34,7 +35,7 @@ send_command "JANITOR" "git-commit-generate"
 sleep 3
 while ! is_session_idle "JANITOR"; do sleep 5; done
 
-send_command "JANITOR" "git push"
+send_command "JANITOR" "mygit push"
 sleep 3
 while ! is_session_idle "JANITOR"; do sleep 5; done
 

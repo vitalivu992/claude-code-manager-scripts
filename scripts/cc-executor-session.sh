@@ -1,8 +1,9 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source "$SCRIPT_DIR/tmux-session.sh"
+load_config
 
-datadir="$HOME/.ai-coding-team"
+datadir="$HOME/.claude-auto-code"
 mkdir -p "$datadir"
 base_name=$(get_base_name)
 session_name="${base_name}-EXECUTOR"
@@ -61,7 +62,7 @@ if [ -f "$reviewer_mail" ]; then
 
         create_session "EXECUTOR"
         interrupt_current_command "EXECUTOR"
-        send_command "EXECUTOR" "claude-zaiglm /ralph-loop:ralph-loop \"review the code changes, existing source code, documents and the plan $plan_file_path and the gaps documented and plan in $plan_gaps_file_path, review if the gaps are valid or not, then fix the necessary gaps, make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""
+        send_command "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR /ralph-loop:ralph-loop \"review the code changes, existing source code, documents and the plan $plan_file_path and the gaps documented and plan in $plan_gaps_file_path, review if the gaps are valid or not, then fix the necessary gaps, make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""
         rm -f "$reviewer_mail"
         exit 0
     fi
@@ -82,7 +83,7 @@ if [ -f "$planner_mail" ]; then
     echo "$plan_file_path" > "$executor_plan"
 
     create_session "EXECUTOR"
-    send_command "EXECUTOR" "claude-zaiglm /ralph-loop:ralph-loop \"review existing source code, documents and execute the plan $plan_file_path, make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""
+    send_command "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR /ralph-loop:ralph-loop \"review existing source code, documents and execute the plan $plan_file_path, make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""
     rm -f "$planner_mail"
     exit 0
 fi

@@ -1,8 +1,9 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 source "$SCRIPT_DIR/tmux-session.sh"
+load_config
 
-datadir="$HOME/.ai-coding-team"
+datadir="$HOME/.claude-auto-code"
 mkdir -p "$datadir"
 base_name=$(get_base_name)
 session_name="${base_name}-REVIEWER"
@@ -52,7 +53,7 @@ if [ -z "$plan_file_path" ]; then
 fi
 
 create_session "REVIEWER"
-send_command "REVIEWER" "claude-zaiglm /reviewer-review-impl-gaps $plan_file_path"
+send_command "REVIEWER" "$AUTOCODE_CMD_REVIEWER /reviewer-review-impl-gaps $plan_file_path"
 rm -f "$executor_mail"
 
 exit 0

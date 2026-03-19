@@ -3,7 +3,6 @@ SHELL         := /bin/bash
 
 INSTALL_DIR          ?= $(HOME)/.local/bin
 COMMANDS_DIR         ?= $(HOME)/.claude/commands
-PROJECT_COMMANDS_DIR ?= $(CURDIR)/.claude/commands
 DATADIR              ?= $(HOME)/.claude-auto-code
 BIN           := $(CURDIR)/bin/autocode
 
@@ -15,7 +14,7 @@ BOLD   := \033[1m
 OK     := $(GREEN)✔$(RESET)
 MISS   := $(RED)✘$(RESET)
 
-.PHONY: help check configure install commands test
+.PHONY: help check configure install test
 
 help: ## Show this help message
 	@printf "$(BOLD)autocode-scripts$(RESET) — multi-agent AI coding workflow\n\n"
@@ -27,7 +26,6 @@ help: ## Show this help message
 	@printf "  make check        # verify all dependencies\n"
 	@printf "  make configure    # set up data directory and config\n"
 	@printf "  make install      # add autocode to PATH and copy commands to ~/.claude/commands/\n"
-	@printf "  make commands     # copy commands to current project (.claude/commands/)\n"
 	@printf "\n$(BOLD)THEN, FROM ANY REPO$(RESET)\n"
 	@printf "  autocode plan \"Add feature X\"   # set requirements\n"
 	@printf "  autocode run                     # start the workflow\n"
@@ -62,11 +60,6 @@ configure: ## Create data directory and default config file
 		printf "  $(YELLOW)~$(RESET) $(DATADIR)/config already exists, skipping\n"; \
 	fi
 	@printf "\n$(GREEN)Done!$(RESET) Run 'make install' then 'autocode help' to get started.\n"
-
-commands: ## Copy Claude commands to current project (.claude/commands/)
-	@mkdir -p "$(PROJECT_COMMANDS_DIR)"
-	@cp commands/*.md "$(PROJECT_COMMANDS_DIR)/"
-	@printf "  $(OK) Copied commands to $(PROJECT_COMMANDS_DIR)\n"
 
 test: ## Run all tests
 	@printf "$(BOLD)Running tests...$(RESET)\n"

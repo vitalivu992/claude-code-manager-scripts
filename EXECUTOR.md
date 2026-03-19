@@ -18,7 +18,7 @@ All state is under `~/.claude-auto-code/`, keyed by the current working director
 Run from the repo you want to execute against (so `pwd` is that repo):
 
 ```cron
-*/5 * * * * cd /path/to/your/repo && /path/to/workspace/skills/claude-auto-code/scripts/cc-executor-session.sh
+*/5 * * * * cd /path/to/your/repo && /path/to/autocode-scripts/scripts/cc-executor-session.sh
 ```
 
 ## What the script does each run
@@ -52,8 +52,7 @@ If the REVIEWER has approved the implementation:
 If the REVIEWER sent back a gaps plan (a `~/.claude/plans/` path):
 
 - Reads the original plan file path from `<session_name>.EXECUTOR.plan`.
-- Creates the EXECUTOR session if needed.
-- Interrupts the current command in the EXECUTOR pane (in case the previous `/ralph-loop` is still attached).
+- Creates the EXECUTOR session.
 - Sends the fix-gaps command to the EXECUTOR:
   ```
   claude /ralph-loop:ralph-loop "review the code changes, existing source code,
@@ -98,7 +97,7 @@ First time the EXECUTOR receives a task:
 1. **First run after PLANNER writes mail:** No session → create session, launch `/ralph-loop` with plan. Exit.
 2. **Next runs (executor still working):** Session running, no `READY_FOR_REVIEW` in output → print status, exit.
 3. **Run after executor outputs `READY_FOR_REVIEW`:** Session idle, `READY_FOR_REVIEW` found → write plan path to `.REVIEWER.mail`, send `/exit`, kill EXECUTOR session. Exit.
-4. **After REVIEWER sends gaps plan:** No session (previous finished), mail has gaps path → interrupt, re-launch with gap-fix context. Exit.
+4. **After REVIEWER sends gaps plan:** No session (previous finished), mail has gaps path → create session, launch with gap-fix context. Exit.
 5. **After REVIEWER approves:** No session, mail has `REVIEWER_APPROVED` → forward to `.JANITOR.mail`. Exit.
 
 ## Dependencies

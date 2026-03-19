@@ -1,0 +1,232 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+AUTOCODE_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPTS_DIR="$AUTOCODE_HOME/scripts"
+
+source "$SCRIPTS_DIR/tmux-session.sh"
+load_config
+
+datadir="$HOME/.claude-auto-code"
+mkdir -p "$datadir"
+
+AUTOCODE_INTERVAL="${AUTOCODE_INTERVAL:-30}"
+
+_green()  { printf '\033[0;32m%s\033[0m\n' "$*"; }
+_red()    { printf '\033[0;31m%s\033[0m\n' "$*"; }
+_yellow() { printf '\033[0;33m%s\033[0m\n' "$*"; }
+_bold()   { printf '\033[1m%s\033[0m\n' "$*"; }
+
+cmd_help() {
+    _bold "autocode — multi-agent AI coding workflow"
+    echo ""
+    echo "USAGE"
+    echo "  autocode <command> [args]"
+    echo ""
+    echo "COMMANDS"
+    printf "  %-30s %s\n" 'plan "<requirement>"' 'Set requirements for the PLANNER (creates mail file)'
+    printf "  %-30s %s\n" 'run [--once]'          'Run the full workflow loop (or a single tick with --once)'
+    printf "  %-30s %s\n" 'status'                 'Show active tmux sessions and pending mail files'
+    printf "  %-30s %s\n" 'stop'                   'Kill all workflow sessions for this repo'
+    printf "  %-30s %s\n" 'help'                   'Show this help message'
+    echo ""
+    echo "QUICKSTART"
+    echo "  cd /path/to/your/repo"
+    echo "  autocode plan \"Add user authentication with OAuth\""
+    echo "  autocode run"
+    echo ""
+    echo "OPTIONS"
+    printf "  %-30s %s\n" 'AUTOCODE_INTERVAL=<seconds>' "Polling interval for 'run' (default: $AUTOCODE_INTERVAL)"
+    printf "  %-30s %s\n" 'AUTOCODE_CMD_PLANNER=<cmd>'  "Claude command for PLANNER role (default: $AUTOCODE_CMD_PLANNER)"
+    printf "  %-30s %s\n" 'AUTOCODE_CMD_EXECUTOR=<cmd>' "Claude command for EXECUTOR role (default: $AUTOCODE_CMD_EXECUTOR)"
+    printf "  %-30s %s\n" 'AUTOCODE_CMD_REVIEWER=<cmd>' "Claude command for REVIEWER role (default: $AUTOCODE_CMD_REVIEWER)"
+    echo ""
+    echo "  Persistent config: ~/.claude-auto-code/config (created by 'make configure')"
+    echo ""
+    echo "INSTALLATION"
+    echo "  make install          # create symlink in ~/.local/bin"
+    echo "  npm link              # or install globally via npm"
+    echo "  make check            # verify all dependencies"
+    echo "  make configure        # set up required directories and commands"
+}
+
+cmd_plan() {
+    local requirement="${1:-}"
+    local base_name
+    base_name=$(get_base_name "$(pwd)")
+    local mail_file="$datadir/${base_name}.PLANNER.mail"
+
+    if [ -z "$requirement" ]; then
+        _red "Error: requirement text is required"
+        echo "Usage: autocode plan \"<requirement text>\""
+        exit 1
+    fi
+
+    echo "$requirement" > "$mail_file"
+    _green "Requirement written to $mail_file"
+    echo "Run 'autocode run' to start the workflow."
+}
+
+_is_workflow_done() {
+    local base_name
+    base_name=$(get_base_name "$(pwd)")
+    local janitor_mail="$datadir/${base_name}-EXECUTOR.JANITOR.mail"
+    for role in PLANNER EXECUTOR REVIEWER JANITOR; do
+        if tmux has-session -t "${base_name}-${role}" 2>/dev/null; then
+            return 1
+        fi
+    done
+    if [ -f "$janitor_mail" ]; then
+        return 1
+    fi
+    local planner_mail="$datadir/${base_name}-PLANNER.EXECUTOR.mail"
+    local reviewer_executor_mail="$datadir/${base_name}-REVIEWER.EXECUTOR.mail"
+    local executor_reviewer_mail="$datadir/${base_name}-EXECUTOR.REVIEWER.mail"
+    if [ -f "$planner_mail" ] || [ -f "$reviewer_executor_mail" ] || [ -f "$executor_reviewer_mail" ]; then
+        return 1
+    fi
+    return 0
+}
+
+_tick() {
+    local repo_path="${1:-$(pwd)}"
+    "$SCRIPTS_DIR/cc-planner-session.sh"
+    "$SCRIPTS_DIR/cc-executor-session.sh"
+    "$SCRIPTS_DIR/cc-reviewer-session.sh"
+    "$SCRIPTS_DIR/cc-janitor-session.sh"
+}
+
+cmd_run() {
+    local once=false
+    if [ "${1:-}" = "--once" ]; then
+        once=true
+    fi
+
+    local base_name
+    base_name=$(get_base_name "$(pwd)")
+    local planner_mail="$datadir/${base_name}.PLANNER.mail"
+
+    if ! $once; then
+        if [ ! -f "$planner_mail" ]; then
+            _yellow "No requirement set. The PLANNER will auto-select a feature."
+            echo "Tip: run 'autocode plan \"<requirement>\"' first to set a specific goal."
+        fi
+        echo "Starting workflow loop (interval: ${AUTOCODE_INTERVAL}s). Press Ctrl+C to stop."
+        echo ""
+    fi
+
+    _tick "$(pwd)"
+
+    if $once; then
+        return 0
+    fi
+
+    while true; do
+        sleep "$AUTOCODE_INTERVAL"
+        echo "--- tick $(date '+%H:%M:%S') ---"
+        _tick "$(pwd)"
+
+        if _is_workflow_done; then
+            echo ""
+            _green "Workflow complete! All sessions finished and mail cleaned up."
+            break
+        fi
+    done
+}
+
+cmd_status() {
+    local base_name
+    base_name=$(get_base_name "$(pwd)")
+
+    echo "Repo:     $(pwd)"
+    echo "Base:     $base_name"
+    echo ""
+
+    _bold "Role commands:"
+    printf "  %-10s %s\n" "PLANNER"  "$AUTOCODE_CMD_PLANNER"
+    printf "  %-10s %s\n" "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR"
+    printf "  %-10s %s\n" "REVIEWER" "$AUTOCODE_CMD_REVIEWER"
+    echo ""
+
+    _bold "Tmux sessions:"
+    local found_session=false
+    for role in PLANNER EXECUTOR REVIEWER JANITOR; do
+        local session="${base_name}-${role}"
+        if tmux has-session -t "$session" 2>/dev/null; then
+            _green "  [running] $session"
+            found_session=true
+        fi
+    done
+    if ! $found_session; then
+        echo "  (none)"
+    fi
+
+    echo ""
+    _bold "Mail files:"
+    local found_mail=false
+    for f in "$datadir/${base_name}"*; do
+        if [ -f "$f" ]; then
+            local fname
+            fname=$(basename "$f")
+            local content
+            content=$(cat "$f")
+            echo "  $fname"
+            echo "    -> $content"
+            found_mail=true
+        fi
+    done
+    if ! $found_mail; then
+        echo "  (none)"
+    fi
+}
+
+cmd_stop() {
+    local base_name
+    base_name=$(get_base_name "$(pwd)")
+
+    echo "Stopping all workflow sessions for: $base_name"
+    local stopped=0
+    for role in PLANNER EXECUTOR REVIEWER JANITOR; do
+        local session="${base_name}-${role}"
+        if tmux has-session -t "$session" 2>/dev/null; then
+            tmux kill-session -t "$session"
+            _red "  Killed: $session"
+            stopped=$((stopped + 1))
+        fi
+    done
+
+    if [ "$stopped" -eq 0 ]; then
+        echo "  No active sessions found."
+    fi
+
+    echo ""
+    echo "Cleaning up mail and lock files..."
+    local cleaned=0
+    for f in "$datadir/${base_name}"*.lock "$datadir/${base_name}"*.mail "$datadir/${base_name}"*.plan; do
+        if [ -f "$f" ]; then
+            rm -f "$f"
+            echo "  Removed: $(basename "$f")"
+            cleaned=$((cleaned + 1))
+        fi
+    done
+    if [ "$cleaned" -eq 0 ]; then
+        echo "  No files to clean."
+    fi
+}
+
+COMMAND="${1:-help}"
+shift || true
+
+case "$COMMAND" in
+    plan)     cmd_plan "$@" ;;
+    run)      cmd_run "$@" ;;
+    status)   cmd_status ;;
+    stop)     cmd_stop ;;
+    help|--help|-h) cmd_help ;;
+    *)
+        _red "Unknown command: $COMMAND"
+        echo ""
+        cmd_help
+        exit 1
+        ;;
+esac

@@ -286,6 +286,11 @@ cmd_stop() {
     echo ""
     echo "Cleaning up state files..."
     local cleaned=0
+    if [ -d "$datadir/${base_name}.lockdir" ]; then
+        rm -rf "$datadir/${base_name}.lockdir"
+        echo "  Removed: ${base_name}.lockdir"
+        cleaned=$((cleaned + 1))
+    fi
     for f in "$datadir/${base_name}".lock "$datadir/${base_name}".state "$datadir/${base_name}".meta "$datadir/${base_name}".PLANNER.mail; do
         if [ -f "$f" ]; then
             rm -f "$f"

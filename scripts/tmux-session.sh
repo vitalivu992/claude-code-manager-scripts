@@ -95,7 +95,7 @@ send_command() {
 # ----------------------------------------------------------------------------
 capture_last_lines() {
     local role="$1"                     # PLANNER / EXECUTOR / REVIEWER / JANITOR
-    local length="${2:-15}"
+    local length="${2:-30}"
     local repo_path="${3:-$(pwd)}"
     local base=$(get_base_name "$repo_path")
     local session="${base}-${role}"
@@ -109,12 +109,9 @@ capture_last_lines() {
 
     # 2. Capture last $length lines (exact tmux syntax)
     local output
-    output=$(tmux capture-pane -S -$length -p -t "$session" 2>/dev/null)
+    output=$(tmux capture-pane -S -"$length" -p -t "$session" 2>/dev/null | head -n "$((length -5))")
 
-    echo -e "\n📋 Last $length lines"
-    echo "---"
     echo "$output"
-    echo "---"
 }
 
 # Returns 0 if the session pane output has not changed between two captures
@@ -130,13 +127,18 @@ is_session_idle() {
     fi
 
     local snap1 snap2
-    snap1=$(tmux capture-pane -S -20 -p -t "$session" 2>/dev/null)
-    sleep 2
-    snap2=$(tmux capture-pane -S -20 -p -t "$session" 2>/dev/null)
+    snap1=$(capture_last_lines "$role" 30)
+    sleep 5
+    snap2=$(capture_last_lines "$role" 30)
 
     if [ "$snap1" = "$snap2" ]; then
         return 0
     else
+        echo "💜 Session $session is still active------------------------------------"
+        echo "#####"
+        snaplength=$(echo "$snap2" | wc -l)
+        echo "$snap2" | head -n "$((snaplength -5))"|tail -n 10
+        echo "------------------------------------------------------------------------"
         return 1
     fi
 }

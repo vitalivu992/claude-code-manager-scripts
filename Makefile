@@ -13,7 +13,7 @@ BOLD   := \033[1m
 OK     := $(GREEN)✔$(RESET)
 MISS   := $(RED)✘$(RESET)
 
-.PHONY: help check configure install
+.PHONY: help check configure install test
 
 help: ## Show this help message
 	@printf "$(BOLD)autocode-scripts$(RESET) — multi-agent AI coding workflow\n\n"
@@ -73,6 +73,13 @@ configure: ## Create directories and install Claude Code commands
 		printf "  $(YELLOW)~$(RESET) $(DATADIR)/config already exists, skipping\n"; \
 	fi
 	@printf "\n$(GREEN)Done!$(RESET) Run 'make install' then 'autocode help' to get started.\n"
+
+test: ## Run all tests
+	@printf "$(BOLD)Running tests...$(RESET)\n"
+	@bash tests/test_state_meta.sh
+	@bash tests/test_role_guards.sh
+	@bash tests/test_retry.sh
+	@printf "\n$(GREEN)All test suites passed.$(RESET)\n"
 
 install: ## Symlink bin/autocode into ~/.local/bin (no npm required)
 	@mkdir -p "$(INSTALL_DIR)"

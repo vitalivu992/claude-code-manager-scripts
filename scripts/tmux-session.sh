@@ -188,7 +188,7 @@ capture_last_lines() {
 
     # 2. Capture last $length lines (exact tmux syntax)
     local output
-    output=$(tmux capture-pane -S -"$length" -p -t "$session" 2>/dev/null | head -n "$((length -5))")
+    output=$(tmux capture-pane -S -"$length" -p -t "$session" 2>/dev/null)
 
     echo "$output"
 }
@@ -213,10 +213,9 @@ is_session_idle() {
     if [ "$snap1" = "$snap2" ]; then
         return 0
     else
-        echo "💜 Session $session is still active"
-        echo "#####"
+        echo "💜 Session $session is running"
         snaplength=$(echo "$snap2" | wc -l)
-        echo "$snap2" | tail -n 10 | sed 's/^/> /'
+        echo "$snap2" | grep -vE '^\s*$' | grep -vE '^\s*─────\s*$' | sed 's/^/>>> /' | tail -n 10
         echo ""
         return 1
     fi

@@ -26,14 +26,19 @@ cmd_help() {
     echo "COMMANDS"
     printf "  %-30s %s\n" 'plan "<requirement>"' 'Set requirements for the PLANNER (creates mail file)'
     printf "  %-30s %s\n" 'run [--once]'          'Run the full workflow loop (or a single tick with --once)'
-    printf "  %-30s %s\n" 'status'                 'Show active tmux sessions and pending mail files'
-    printf "  %-30s %s\n" 'stop'                   'Kill all workflow sessions for this repo'
+    printf "  %-30s %s\n" 'retry [--once]'        'Resume workflow from current state (kills stale sessions, retries)'
+    printf "  %-30s %s\n" 'status'                 'Show workflow state, metadata, and active sessions'
+    printf "  %-30s %s\n" 'stop'                   'Kill all workflow sessions and clean up state files'
     printf "  %-30s %s\n" 'help'                   'Show this help message'
     echo ""
     echo "QUICKSTART"
     echo "  cd /path/to/your/repo"
     echo "  autocode plan \"Add user authentication with OAuth\""
     echo "  autocode run"
+    echo ""
+    echo "RETRY (resume after failure)"
+    echo "  autocode retry              # resume from current state and run loop"
+    echo "  autocode retry --once       # resume and run a single tick"
     echo ""
     echo "OPTIONS"
     printf "  %-30s %s\n" 'AUTOCODE_INTERVAL=<seconds>' "Polling interval for 'run' (default: $AUTOCODE_INTERVAL)"
@@ -69,23 +74,18 @@ cmd_plan() {
 }
 
 _is_workflow_done() {
+    local current_state
+    current_state=$(read_state)
+    if [ -n "$current_state" ]; then
+        return 1
+    fi
     local base_name
     base_name=$(get_base_name "$(pwd)")
-    local janitor_mail="$datadir/${base_name}-EXECUTOR.JANITOR.mail"
     for role in PLANNER EXECUTOR REVIEWER JANITOR; do
         if tmux has-session -t "${base_name}-${role}" 2>/dev/null; then
             return 1
         fi
     done
-    if [ -f "$janitor_mail" ]; then
-        return 1
-    fi
-    local planner_mail="$datadir/${base_name}-PLANNER.EXECUTOR.mail"
-    local reviewer_executor_mail="$datadir/${base_name}-REVIEWER.EXECUTOR.mail"
-    local executor_reviewer_mail="$datadir/${base_name}-EXECUTOR.REVIEWER.mail"
-    if [ -f "$planner_mail" ] || [ -f "$reviewer_executor_mail" ] || [ -f "$executor_reviewer_mail" ]; then
-        return 1
-    fi
     return 0
 }
 
@@ -105,9 +105,11 @@ cmd_run() {
     local base_name
     base_name=$(get_base_name "$(pwd)")
     local planner_mail="$datadir/${base_name}.PLANNER.mail"
+    local current_state
+    current_state=$(read_state)
 
     if ! $once; then
-        if [ ! -f "$planner_mail" ]; then
+        if [ -z "$current_state" ] && [ ! -f "$planner_mail" ]; then
             _yellow "No requirement set. The PLANNER will auto-select a feature."
             echo "Tip: run 'autocode plan \"<requirement>\"' first to set a specific goal."
         fi
@@ -128,10 +130,83 @@ cmd_run() {
 
         if _is_workflow_done; then
             echo ""
-            _green "Workflow complete! All sessions finished and mail cleaned up."
+            _green "Workflow complete! All sessions finished and state cleaned up."
             break
         fi
     done
+}
+
+cmd_retry() {
+    local once=false
+    if [ "${1:-}" = "--once" ]; then
+        once=true
+    fi
+
+    local base_name
+    base_name=$(get_base_name "$(pwd)")
+    local current_state
+    current_state=$(read_state)
+
+    if [ -z "$current_state" ]; then
+        _red "No workflow state found. Nothing to retry."
+        _yellow "Use 'autocode plan' and 'autocode run' to start a new workflow."
+        exit 1
+    fi
+
+    _yellow "Current state: $current_state"
+
+    case "$current_state" in
+        planner:active)
+            local sn="${base_name}-PLANNER"
+            tmux has-session -t "$sn" 2>/dev/null && tmux kill-session -t "$sn"
+            local req
+            req=$(read_meta "requirements")
+            if [ -n "$req" ]; then
+                echo "$req" > "$datadir/${base_name}.PLANNER.mail"
+            fi
+            clear_state
+            ;;
+        planner:done)
+            ;;
+        executor:active)
+            local sn="${base_name}-EXECUTOR"
+            tmux has-session -t "$sn" 2>/dev/null && tmux kill-session -t "$sn"
+            local gaps
+            gaps=$(read_meta "gaps_path")
+            if [ -n "$gaps" ]; then
+                write_state "reviewer:gaps"
+            else
+                write_state "planner:done"
+            fi
+            ;;
+        executor:done)
+            ;;
+        reviewer:active)
+            local sn="${base_name}-REVIEWER"
+            tmux has-session -t "$sn" 2>/dev/null && tmux kill-session -t "$sn"
+            write_state "executor:done"
+            ;;
+        reviewer:approved)
+            ;;
+        reviewer:gaps)
+            ;;
+        janitor:commit|janitor:push)
+            local sn="${base_name}-JANITOR"
+            tmux has-session -t "$sn" 2>/dev/null && tmux kill-session -t "$sn"
+            write_state "reviewer:approved"
+            ;;
+        *)
+            _red "Unknown state: $current_state"
+            exit 1
+            ;;
+    esac
+
+    _green "Retry conditions restored. Starting workflow..."
+    if $once; then
+        _tick
+    else
+        cmd_run
+    fi
 }
 
 cmd_status() {
@@ -150,6 +225,31 @@ cmd_status() {
     printf "  %-10s %s\n" "GIT"      "$AUTOCODE_CMD_GIT"
     echo ""
 
+    _bold "Workflow state:"
+    local current_state
+    current_state=$(read_state)
+    if [ -n "$current_state" ]; then
+        _green "  State: $current_state"
+        local updated_at
+        updated_at=$(read_meta "updated_at")
+        [ -n "$updated_at" ] && echo "  Updated: $updated_at"
+        local plan
+        plan=$(read_meta "plan_path")
+        [ -n "$plan" ] && echo "  Plan: $plan"
+        local gaps
+        gaps=$(read_meta "gaps_path")
+        [ -n "$gaps" ] && echo "  Gaps: $gaps"
+        local req
+        req=$(read_meta "requirements")
+        [ -n "$req" ] && echo "  Requirements: $req"
+        local iter
+        iter=$(read_meta "review_iteration")
+        [ -n "$iter" ] && echo "  Review iteration: $iter"
+    else
+        echo "  (idle — no active workflow)"
+    fi
+    echo ""
+
     _bold "Tmux sessions:"
     local found_session=false
     for role in PLANNER EXECUTOR REVIEWER JANITOR; do
@@ -160,24 +260,6 @@ cmd_status() {
         fi
     done
     if ! $found_session; then
-        echo "  (none)"
-    fi
-
-    echo ""
-    _bold "Mail files:"
-    local found_mail=false
-    for f in "$datadir/${base_name}"*; do
-        if [ -f "$f" ]; then
-            local fname
-            fname=$(basename "$f")
-            local content
-            content=$(cat "$f")
-            echo "  $fname"
-            echo "    -> $content"
-            found_mail=true
-        fi
-    done
-    if ! $found_mail; then
         echo "  (none)"
     fi
 }
@@ -202,9 +284,16 @@ cmd_stop() {
     fi
 
     echo ""
-    echo "Cleaning up mail and lock files..."
+    echo "Cleaning up state files..."
     local cleaned=0
-    for f in "$datadir/${base_name}"*.lock "$datadir/${base_name}"*.mail "$datadir/${base_name}"*.plan; do
+    for f in "$datadir/${base_name}".lock "$datadir/${base_name}".state "$datadir/${base_name}".meta "$datadir/${base_name}".PLANNER.mail; do
+        if [ -f "$f" ]; then
+            rm -f "$f"
+            echo "  Removed: $(basename "$f")"
+            cleaned=$((cleaned + 1))
+        fi
+    done
+    for f in "$datadir/${base_name}"*.mail "$datadir/${base_name}"*.plan; do
         if [ -f "$f" ]; then
             rm -f "$f"
             echo "  Removed: $(basename "$f")"
@@ -222,6 +311,7 @@ shift || true
 case "$COMMAND" in
     plan)     cmd_plan "$@" ;;
     run)      cmd_run "$@" ;;
+    retry)    cmd_retry "$@" ;;
     status)   cmd_status ;;
     stop)     cmd_stop ;;
     help|--help|-h) cmd_help ;;

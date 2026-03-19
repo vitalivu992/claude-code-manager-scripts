@@ -51,13 +51,10 @@ check: ## Check all required and optional dependencies
 	_check claude "claude"     "install Claude Code CLI and add alias"; \
 	_check git "git" "apt install git"
 
-configure: ## Create directories and install Claude Code commands
+configure: ## Create data directory and default config file
 	@printf "$(BOLD)Configuring autocode-scripts...$(RESET)\n"
 	@mkdir -p "$(DATADIR)"
 	@printf "  $(OK) Created $(DATADIR)\n"
-	@mkdir -p "$(COMMANDS_DIR)"
-	@cp -u commands/*.md "$(COMMANDS_DIR)/"
-	@printf "  $(OK) Copied commands to $(COMMANDS_DIR)\n"
 	@if [ ! -f "$(DATADIR)/config" ]; then \
 		printf '# autocode per-role command configuration\n# Set the CLI command to use for each role.\n# Environment variables take precedence over this file.\n\nAUTOCODE_CMD_PLANNER=claude\nAUTOCODE_CMD_EXECUTOR=claude\nAUTOCODE_CMD_REVIEWER=claude\nAUTOCODE_CMD_JANITOR=claude\nAUTOCODE_CMD_GIT=git\n' > "$(DATADIR)/config"; \
 		printf "  $(OK) Created $(DATADIR)/config\n"; \
@@ -65,6 +62,11 @@ configure: ## Create directories and install Claude Code commands
 		printf "  $(YELLOW)~$(RESET) $(DATADIR)/config already exists, skipping\n"; \
 	fi
 	@printf "\n$(GREEN)Done!$(RESET) Run 'make install' then 'autocode help' to get started.\n"
+
+commands: ## Copy Claude commands to current project (.claude/commands/)
+	@mkdir -p "$(PROJECT_COMMANDS_DIR)"
+	@cp commands/*.md "$(PROJECT_COMMANDS_DIR)/"
+	@printf "  $(OK) Copied commands to $(PROJECT_COMMANDS_DIR)\n"
 
 test: ## Run all tests
 	@printf "$(BOLD)Running tests...$(RESET)\n"

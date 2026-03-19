@@ -48,11 +48,15 @@ if [ "$current_state" = "janitor:commit" ] || [ "$current_state" = "janitor:push
         echo "💬 git-commit done, running git push"
         write_state "janitor:push"
         write_meta "updated_at" "$(date -Iseconds)"
-        send_command "JANITOR" "$AUTOCODE_CMD_GIT push"
+        send_command "JANITOR" "! $AUTOCODE_CMD_GIT push"
         exit 0
     fi
 
     if [ "$current_state" = "janitor:push" ]; then
+        if ! is_session_idle "JANITOR"; then
+            echo "⏳ JANITOR session is still active, exiting"
+            exit 0
+        fi
         echo "🎉 git push done, cleaning up"
         clear_state
         clear_meta

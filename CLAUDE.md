@@ -166,7 +166,6 @@ Runs three test suites:
 - **realpath** (from `coreutils`): Resolves absolute repo paths for session naming
 - **claude**: Claude Code CLI (used within sessions for `/ralph-loop`, `/planner-*`, `/reviewer-*`)
 - **git**: Version control (configurable via `AUTOCODE_CMD_GIT`)
-- **node/npm** (optional): For `npx` support and global install via `npm link`
 
 ## Role Documentation
 

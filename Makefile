@@ -47,17 +47,6 @@ check: ## Check all required and optional dependencies
 	_check realpath      "realpath (coreutils)" "apt install coreutils"; \
 	_check claude "claude"     "install Claude Code CLI and add alias"; \
 	_check git "git" "apt install git"
-	@printf "\n$(BOLD)Optional dependencies$(RESET)\n"
-	@_checkopt() { \
-		cmd="$$1"; label="$$2"; hint="$$3"; \
-		if command -v "$$cmd" >/dev/null 2>&1; then \
-			printf "  $(OK) %-22s %s\n" "$$label" "$$(command -v $$cmd)"; \
-		else \
-			printf "  $(YELLOW)~$(RESET) %-22s not found  — $$hint\n" "$$label"; \
-		fi; \
-	}; \
-	_checkopt node "node (for npx)"  "https://nodejs.org"; \
-	_checkopt npm  "npm (for npx)"   "https://nodejs.org"
 
 configure: ## Create directories and install Claude Code commands
 	@printf "$(BOLD)Configuring autocode-scripts...$(RESET)\n"
@@ -81,7 +70,7 @@ test: ## Run all tests
 	@bash tests/test_retry.sh
 	@printf "\n$(GREEN)All test suites passed.$(RESET)\n"
 
-install: ## Symlink bin/autocode into ~/.local/bin (no npm required)
+install: ## Symlink bin/autocode into ~/.local/bin
 	@mkdir -p "$(INSTALL_DIR)"
 	@ln -sf "$(BIN)" "$(INSTALL_DIR)/autocode"
 	@printf "  $(OK) Symlinked $(BIN) -> $(INSTALL_DIR)/autocode\n"

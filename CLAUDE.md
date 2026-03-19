@@ -8,7 +8,7 @@ This repository implements a **multi-agent AI coding workflow** that orchestrate
 
 ### Architecture
 
-The workflow consists of four roles that communicate through mail files in `~/.ai-coding-team/`:
+The workflow consists of four roles that communicate through mail files in `~/.claude-auto-code/`:
 
 ```
 ┌─────────────┐     plan path      ┌─────────────┐     READY_FOR_REVIEW     ┌─────────────┐
@@ -32,7 +32,7 @@ Sessions are named `{base_name}-{ROLE}` where `base_name` is derived from the re
 
 ### Mail Files
 
-All mail files reside in `~/.ai-coding-team/`:
+All mail files reside in `~/.claude-auto-code/`:
 
 | File Pattern | Writer | Reader | Content |
 |--------------|--------|--------|---------|
@@ -43,17 +43,78 @@ All mail files reside in `~/.ai-coding-team/`:
 | `{base}-EXECUTOR.JANITOR.mail` | EXECUTOR script | JANITOR script | `REVIEWER_APPROVED` |
 | `{base}.EXECUTOR.plan` | EXECUTOR script | EXECUTOR script | Original plan path (persistent) |
 
+## Installation
+
+### 1. Check dependencies
+
+```bash
+make check
+```
+
+This reports which required and optional tools are available and which are missing.
+
+### 2. Configure
+
+```bash
+make configure
+```
+
+Creates `~/.claude-auto-code/`, copies Claude Code commands to `~/.claude/commands/`, and links the CLI globally if npm is available.
+
+### 3. Install the CLI
+
+```bash
+make install        # symlinks bin/autocode to ~/.local/bin/autocode
+# or
+npm link            # installs via npm (requires node)
+```
+
+Ensure `~/.local/bin` (or your npm bin path) is on `$PATH`.
+
 ## Running the Workflow
 
-### Cron Setup
+### Using the `autocode` CLI (recommended)
+
+```bash
+cd /path/to/your/repo
+
+# Optionally set a specific requirement
+autocode plan "Add user authentication with OAuth"
+
+# Start the workflow — runs until JANITOR completes and pushes
+autocode run
+
+# Check progress at any time
+autocode status
+
+# Abort the workflow
+autocode stop
+```
+
+`autocode run` polls all four role scripts every 30 seconds (configurable via `AUTOCODE_INTERVAL`). It exits automatically once JANITOR finishes.
+
+#### Without installing (via npx)
+
+```bash
+npx autocode-scripts plan "Add user authentication with OAuth"
+npx autocode-scripts run
+```
+
+### Using cron (advanced)
 
 Add entries to crontab (`crontab -e`):
 
 ```cron
-*/5 * * * * cd /path/to/your/repo && /path/to/workspace/skills/ai-coding-team/scripts/cc-planner-session.sh
-*/5 * * * * cd /path/to/your/repo && /path/to/workspace/skills/ai-coding-team/scripts/cc-executor-session.sh
-*/5 * * * * cd /path/to/your/repo && /path/to/workspace/skills/ai-coding-team/scripts/cc-reviewer-session.sh
-*/5 * * * * cd /path/to/your/repo && /path/to/workspace/skills/ai-coding-team/scripts/cc-janitor-session.sh
+*/5 * * * * cd /path/to/your/repo && /path/to/autocode-scripts/scripts/cc-planner-session.sh
+*/5 * * * * cd /path/to/your/repo && /path/to/autocode-scripts/scripts/cc-executor-session.sh
+*/5 * * * * cd /path/to/your/repo && /path/to/autocode-scripts/scripts/cc-reviewer-session.sh
+*/5 * * * * cd /path/to/your/repo && /path/to/autocode-scripts/scripts/cc-janitor-session.sh
+```
+
+When using cron, provide requirements manually:
+
+```bash
+echo "Add user authentication with OAuth" > ~/.claude-auto-code/{base_name}.PLANNER.mail
 ```
 
 ### Manual Session Control
@@ -62,21 +123,14 @@ Attach to a session: `tmux attach -t {session_name}`
 Kill a session: `tmux kill-session -t {session_name}`
 List sessions: `tmux ls`
 
-### Providing Requirements to PLANNER
-
-To seed the planner with requirements, create `{base}.PLANNER.mail` before the first cron run:
-
-```bash
-echo "Add user authentication with OAuth" > ~/.ai-coding-team/{base_name}.PLANNER.mail
-```
-
 ## Dependencies
 
 - **tmux**: Session management
 - **flock** (from `util-linux`): Concurrency protection for cron runs
-- **claude-zaiglm**: Claude Code CLI (used within sessions for `/ralph-loop`, `/planner-*`, `/reviewer-*`)
+- **claude**: Claude Code CLI (used within sessions for `/ralph-loop`, `/planner-*`, `/reviewer-*`)
 - **git-commit-generate**: Auto-commit skill (used by JANITOR)
 - **git**: Version control
+- **node/npm** (optional): For `npx` support and global install via `npm link`
 
 ## Role Documentation
 
@@ -85,6 +139,26 @@ Each role has detailed documentation in the repository root:
 - `EXECUTOR.md` - Executor workflow details
 - `REVIEWER.md` - Reviewer workflow details
 - `JANITOR.md` - Janitor workflow details
+
+## Configuration
+
+### Per-Role Claude Commands
+
+Edit `~/.claude-auto-code/config` (created by `make configure`) to set the Claude command for each role:
+
+```bash
+AUTOCODE_CMD_PLANNER=claude-opus
+AUTOCODE_CMD_EXECUTOR=claude-sonnet
+AUTOCODE_CMD_REVIEWER=claude-sonnet
+```
+
+Resolution order (highest priority first):
+
+1. Environment variable (e.g., `AUTOCODE_CMD_PLANNER=claude-opus autocode run`)
+2. `~/.claude-auto-code/config`
+3. Built-in default (`claude` for Claude roles, `git-commit-generate` for JANITOR)
+
+Run `autocode status` to see which commands are currently active for each role.
 
 ## Script Library
 
@@ -95,6 +169,7 @@ Each role has detailed documentation in the repository root:
 - `capture_last_lines ROLE [length] [path]` - Capture and print last N lines
 - `is_session_idle ROLE [path]` - Check if session is idle (no output change in 2 seconds)
 - `interrupt_current_command ROLE [path]` - Send Ctrl+C to interrupt running command
+- `load_config` - Load `~/.claude-auto-code/config` and set per-role command variables
 
 ## Key Workflow Signals
 

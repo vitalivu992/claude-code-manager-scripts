@@ -10,17 +10,17 @@ The script drives a **PLANNER** tmux session that creates a plan; when the plann
 2. If the planner is still running, the cron run just reports status.
 3. When the planner becomes idle, the script detects it and writes the plan path to `EXECUTOR.mail` for the next stage.
 
-All state is under `~/.ai-coding-team/`, keyed by the current working directory (repo path) when the script runs.
+All state is under `~/.claude-auto-code/`, keyed by the current working directory (repo path) when the script runs.
 
 ## Cron setup
 
 Run from the repo you want to plan (so `pwd` is that repo):
 
 ```cron
-*/5 * * * * cd /path/to/your/repo && /path/to/workspace/skills/ai-coding-team/scripts/cc-planner-session.sh
+*/5 * * * * cd /path/to/your/repo && /path/to/workspace/skills/claude-auto-code/scripts/cc-planner-session.sh
 ```
 
-Use the real path to the script and ensure the cron environment can see `tmux` and `claude-zaiglm` (or adjust `PATH` in the cron job).
+Use the real path to the script and ensure the cron environment can see `tmux` and `claude` (or adjust `PATH` in the cron job).
 
 ## What the script does each run
 
@@ -37,9 +37,9 @@ If there is **no** PLANNER session for this repo:
 
 - Creates a detached tmux session named `<repo-base>-PLANNER` (e.g. `home-ltvu-myproject-PLANNER`).
 - Enters the planning session:
-  - If `~/.ai-coding-team/<base_name>.PLANNER.mail` exists: runs  
-    `claude-zaiglm /planner-create-plan <contents of .PLANNER.mail>`.
-  - Otherwise: runs `claude-zaiglm /planner-auto-plan`.
+  - If `~/.claude-auto-code/<base_name>.PLANNER.mail` exists: runs  
+    `claude /planner-create-plan <contents of .PLANNER.mail>`.
+  - Otherwise: runs `claude /planner-auto-plan`.
 - Captures and prints the last 10 lines of the PLANNER pane.
 - Exits. The planner keeps running in tmux; the next cron run will see the session.
 
@@ -52,12 +52,12 @@ If a PLANNER session **does** exist:
     `tmux attach -t <session_name>`. Exits.
   - **Idle (snapshots identical):** proceeds to extract the plan file path.
     - Captures the full pane output, finds the line containing `~/.claude/plans/`, takes the last field.
-    - Writes that path to `~/.ai-coding-team/<session_name>.EXECUTOR.mail`.
+    - Writes that path to `~/.claude-auto-code/<session_name>.EXECUTOR.mail`.
     - Downstream (e.g. an EXECUTOR script) can read this file to know which plan to run.
 
 ## Data directory and files
 
-- **Directory:** `~/.ai-coding-team/` (script uses `mkdir -p`).
+- **Directory:** `~/.claude-auto-code/` (script uses `mkdir -p`).
 - **Session base name:** from `get_base_name $(pwd)` in `tmux-session.sh` (absolute path with `/` replaced by `-`, leading `-` removed). Example: `home-ltvu-myproject` → session `home-ltvu-myproject-PLANNER`.
 
 | File | Purpose |
@@ -78,7 +78,7 @@ So the planner is started or continued by cron; when it goes idle, the script au
 
 - **tmux:** session creation and pane capture.
 - **tmux-session.sh:** provides `get_base_name`, `get_session_name`, `create_session`, `send_command`, `capture_last_lines`, `is_session_idle`.
-- **claude-zaiglm:** used inside the PLANNER session for `/planner-create-plan` and `/planner-auto-plan` (must be available in the environment of the tmux session, i.e. when cron runs the script from the repo).
+- **claude:** used inside the PLANNER session for `/planner-create-plan` and `/planner-auto-plan` (must be available in the environment of the tmux session, i.e. when cron runs the script from the repo).
 
 ## Attaching to the PLANNER
 

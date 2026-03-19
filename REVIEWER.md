@@ -9,14 +9,14 @@ The script drives a **REVIEWER** tmux session that checks the EXECUTOR's impleme
 1. If the REVIEWER session is already running, the script polls its output for a decision: either a gaps plan file path or the literal text `REVIEWER_APPROVED`.
 2. If no session is running, the script reads the mail box and starts a review when the EXECUTOR has signalled `READY_FOR_REVIEW`.
 
-All state is under `~/.ai-coding-team/`, keyed by the current working directory (repo path) when the script runs.
+All state is under `~/.claude-auto-code/`, keyed by the current working directory (repo path) when the script runs.
 
 ## Cron setup
 
 Run from the repo (so `pwd` is that repo):
 
 ```cron
-*/5 * * * * cd /path/to/your/repo && /path/to/workspace/skills/ai-coding-team/scripts/cc-reviewer-session.sh
+*/5 * * * * cd /path/to/your/repo && /path/to/workspace/skills/claude-auto-code/scripts/cc-reviewer-session.sh
 ```
 
 ## What the script does each run
@@ -44,7 +44,7 @@ When the EXECUTOR writes the plan path to the mail box (after outputting `READY_
 - Creates the REVIEWER tmux session.
 - Sends the review command:
   ```
-  claude-zaiglm /reviewer-review-impl-gaps <PLAN_FILE_PATH>
+  claude /reviewer-review-impl-gaps <PLAN_FILE_PATH>
   ```
 - Removes the REVIEWER mail.
 - Exits. The reviewer runs in tmux; subsequent cron runs will see the session and poll its output.
@@ -60,7 +60,7 @@ The `/reviewer-review-impl-gaps` command will produce one of two outcomes, detec
 
 ## Data directory and files
 
-- **Directory:** `~/.ai-coding-team/` (script uses `mkdir -p`).
+- **Directory:** `~/.claude-auto-code/` (script uses `mkdir -p`).
 - **Session base name:** from `get_base_name $(pwd)` in `tmux-session.sh`.
 
 | File | Purpose |
@@ -79,4 +79,4 @@ The `/reviewer-review-impl-gaps` command will produce one of two outcomes, detec
 
 - **tmux:** session creation and pane capture.
 - **tmux-session.sh:** provides `get_base_name`, `create_session`, `send_command`, `is_session_idle`.
-- **claude-zaiglm:** used inside the REVIEWER session for `/reviewer-review-impl-gaps`.
+- **claude:** used inside the REVIEWER session for `/reviewer-review-impl-gaps`.

@@ -6,14 +6,14 @@ This describes how the janitor works when you run `scripts/cc-janitor-session.sh
 
 The **JANITOR** is the final stage of the pipeline. It is triggered only once — when the EXECUTOR forwards `REVIEWER_APPROVED`. Its job is to commit, push, and terminate all workflow sessions, leaving the repo in a clean state.
 
-All state is under `~/.ai-coding-team/`, keyed by the current working directory (repo path) when the script runs.
+All state is under `~/.claude-auto-code/`, keyed by the current working directory (repo path) when the script runs.
 
 ## Cron setup
 
 Run from the repo (so `pwd` is that repo):
 
 ```cron
-*/5 * * * * cd /path/to/your/repo && /path/to/workspace/skills/ai-coding-team/scripts/cc-janitor-session.sh
+*/5 * * * * cd /path/to/your/repo && /path/to/workspace/skills/claude-auto-code/scripts/cc-janitor-session.sh
 ```
 
 ## What the script does each run
@@ -40,7 +40,7 @@ After step 5, no workflow tmux sessions remain and the repo has been committed a
 
 ## Data directory and files
 
-- **Directory:** `~/.ai-coding-team/` (script uses `mkdir -p`).
+- **Directory:** `~/.claude-auto-code/` (script uses `mkdir -p`).
 - **Session base name:** from `get_base_name $(pwd)` in `tmux-session.sh`.
 
 | File | Purpose |

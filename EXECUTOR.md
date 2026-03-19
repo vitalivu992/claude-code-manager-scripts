@@ -11,14 +11,14 @@ The script drives an **EXECUTOR** tmux session that implements a plan produced b
 3. When the REVIEWER sends back a gaps plan, the EXECUTOR re-runs with the gap-fix context.
 4. When the REVIEWER approves, the EXECUTOR forwards `REVIEWER_APPROVED` to the JANITOR.
 
-All state is under `~/.ai-coding-team/`, keyed by the current working directory (repo path) when the script runs.
+All state is under `~/.claude-auto-code/`, keyed by the current working directory (repo path) when the script runs.
 
 ## Cron setup
 
 Run from the repo you want to execute against (so `pwd` is that repo):
 
 ```cron
-*/5 * * * * cd /path/to/your/repo && /path/to/workspace/skills/ai-coding-team/scripts/cc-executor-session.sh
+*/5 * * * * cd /path/to/your/repo && /path/to/workspace/skills/claude-auto-code/scripts/cc-executor-session.sh
 ```
 
 ## What the script does each run
@@ -56,7 +56,7 @@ If the REVIEWER sent back a gaps plan (a `~/.claude/plans/` path):
 - Interrupts the current command in the EXECUTOR pane (in case the previous `/ralph-loop` is still attached).
 - Sends the fix-gaps command to the EXECUTOR:
   ```
-  claude-zaiglm /ralph-loop:ralph-loop "review the code changes, existing source code,
+  claude /ralph-loop:ralph-loop "review the code changes, existing source code,
   documents and the plan <PLAN_FILE> and the gaps documented and plan in <GAPS_FILE>,
   review if the gaps are valid or not, then fix the necessary gaps,
   make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW"
@@ -73,7 +73,7 @@ First time the EXECUTOR receives a task:
 - Creates the EXECUTOR session.
 - Sends the initial execution command:
   ```
-  claude-zaiglm /ralph-loop:ralph-loop "review existing source code, documents and execute
+  claude /ralph-loop:ralph-loop "review existing source code, documents and execute
   the plan <PLAN_FILE>, make sure all requirements are fulfilled,
   all tests pass then output READY_FOR_REVIEW"
   --completion-promise "READY_FOR_REVIEW"
@@ -82,7 +82,7 @@ First time the EXECUTOR receives a task:
 
 ## Data directory and files
 
-- **Directory:** `~/.ai-coding-team/` (script uses `mkdir -p`).
+- **Directory:** `~/.claude-auto-code/` (script uses `mkdir -p`).
 - **Session base name:** from `get_base_name $(pwd)` in `tmux-session.sh`.
 
 | File | Purpose |
@@ -105,4 +105,4 @@ First time the EXECUTOR receives a task:
 
 - **tmux:** session creation, pane capture, key sending.
 - **tmux-session.sh:** provides `get_base_name`, `get_session_name`, `create_session`, `send_command`, `interrupt_current_command`, `capture_last_lines`.
-- **claude-zaiglm:** used inside the EXECUTOR session for `/ralph-loop:ralph-loop`.
+- **claude:** used inside the EXECUTOR session for `/ralph-loop:ralph-loop`.

@@ -29,29 +29,51 @@ fi
 
 echo "✅ REVIEWER_APPROVED received, starting JANITOR tasks"
 
+if tmux has-session -t "$session_name" 2>/dev/null; then
+    echo "✅ JANITOR session exists"
+    if ! is_session_idle "JANITOR"; then
+        echo "⏳ JANITOR session is still active, exiting"
+        exit 0
+    fi
+
+    echo "💤 JANITOR session is idle, checking output"
+    output=$(capture_last_lines "JANITOR" 30)
+    echo "$output"
+
+    current_state=$(read_state)
+
+    if [ "$current_state" = "janitor:git-commit" ]; then
+        echo "💬 git-commit done, running git push"
+        write_state "janitor:git-push"
+        send_command "JANITOR" "$AUTOCODE_CMD_GIT push"
+        exit 0
+    fi
+
+    if [ "$current_state" = "janitor:git-push" ]; then
+        echo "🎉 git push done, cleaning up"
+        rm -f "$executor_mail"
+        rm -f "$datadir/${base_name}.EXECUTOR.plan"
+        clear_state
+        for lock in "$datadir/${base_name}"-*.lock; do
+            [ -f "$lock" ] && rm -f "$lock"
+        done
+        echo "🧹 Terminating all workflow sessions..."
+        for role in "PLANNER" "EXECUTOR" "REVIEWER" "JANITOR"; do
+            role_session="${base_name}-${role}"
+            if tmux has-session -t "$role_session" 2>/dev/null; then
+                tmux kill-session -t "$role_session"
+                echo "🛑 Killed session: $role_session"
+            fi
+        done
+        exit 0
+    fi
+
+    echo "❓ Unknown state: $current_state, exiting"
+    exit 0
+fi
+
 create_session "JANITOR"
 
+write_state "janitor:git-commit"
 send_command "JANITOR" "$AUTOCODE_CMD_JANITOR -p \"/git-commit\""
-sleep 3
-while ! is_session_idle "JANITOR"; do sleep 5; done
-
-send_command "JANITOR" "$AUTOCODE_CMD_GIT push"
-sleep 3
-while ! is_session_idle "JANITOR"; do sleep 5; done
-
-rm -f "$executor_mail"
-rm -f "$datadir/${base_name}.EXECUTOR.plan"
-for lock in "$datadir/${base_name}"-*.lock; do
-    [ -f "$lock" ] && rm -f "$lock"
-done
-
-echo "🧹 Terminating all workflow sessions..."
-for role in "PLANNER" "EXECUTOR" "REVIEWER" "JANITOR"; do
-    role_session="${base_name}-${role}"
-    if tmux has-session -t "$role_session" 2>/dev/null; then
-        tmux kill-session -t "$role_session"
-        echo "🛑 Killed session: $role_session"
-    fi
-done
-
 exit 0

@@ -1,6 +1,28 @@
 #!/bin/bash
 # Hands-on tmux scripting for your repo workflow (PLANNER / EXECUTOR / REVIEWER)
 
+get_state_file() {
+    local repo_path="${1:-$(pwd)}"
+    local base=$(get_base_name "$repo_path")
+    echo "$HOME/.claude-auto-code/${base}.state"
+}
+
+read_state() {
+    local repo_path="${1:-$(pwd)}"
+    cat "$(get_state_file "$repo_path")" 2>/dev/null
+}
+
+write_state() {
+    local state="$1"
+    local repo_path="${2:-$(pwd)}"
+    echo "$state" > "$(get_state_file "$repo_path")"
+}
+
+clear_state() {
+    local repo_path="${1:-$(pwd)}"
+    rm -f "$(get_state_file "$repo_path")"
+}
+
 load_config() {
     local config_file="$HOME/.claude-auto-code/config"
     [ -f "$config_file" ] && source "$config_file"

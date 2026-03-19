@@ -39,6 +39,12 @@ if [ "$current_state" = "janitor:commit" ] || [ "$current_state" = "janitor:push
     echo "$output"
 
     if [ "$current_state" = "janitor:commit" ]; then
+
+        if ! is_session_idle "JANITOR"; then
+            echo "⏳ JANITOR session is still active, exiting"
+            exit 0
+        fi
+
         echo "💬 git-commit done, running git push"
         write_state "janitor:push"
         write_meta "updated_at" "$(date -Iseconds)"
@@ -67,7 +73,9 @@ fi
 
 echo "✅ REVIEWER_APPROVED, starting JANITOR tasks"
 create_session "JANITOR"
-send_command "JANITOR" "$AUTOCODE_CMD_JANITOR -p \"/git-commit\""
+send_command "JANITOR" "$AUTOCODE_CMD_JANITOR"
+sleep 10
+send_command "JANITOR" "/git-commit"
 write_state "janitor:commit"
 write_meta "updated_at" "$(date -Iseconds)"
 exit 0

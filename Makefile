@@ -3,6 +3,7 @@ SHELL         := /bin/bash
 
 INSTALL_DIR          ?= $(HOME)/.local/bin
 COMMANDS_DIR         ?= $(HOME)/.claude/commands
+PROJECT_COMMANDS_DIR ?= $(CURDIR)/.claude/commands
 DATADIR              ?= $(HOME)/.claude-auto-code
 BIN           := $(CURDIR)/bin/autocode
 

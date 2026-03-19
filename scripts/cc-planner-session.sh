@@ -13,15 +13,7 @@ case "$current_state" in
     *) echo "Not PLANNER's turn (state: $current_state)"; exit 0 ;;
 esac
 
-LOCK_FILE="$datadir/${base_name}.lock"
-if [ "${_AUTOCODE_LOCKED:-}" != "1" ]; then
-    export _AUTOCODE_LOCKED=1
-    flock -n -E 200 "$LOCK_FILE" "$0" "$@"
-    rc=$?
-    [ $rc -eq 200 ] && echo "🔒 Another role is running, exiting PLANNER" && exit 0
-    exit $rc
-fi
-unset _AUTOCODE_LOCKED
+acquire_role_lock "PLANNER" "$base_name" || exit 0
 
 current_state=$(read_state)
 case "$current_state" in

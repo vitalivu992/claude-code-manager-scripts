@@ -9,7 +9,7 @@ get_state_file() {
 
 read_state() {
     local repo_path="${1:-$(pwd)}"
-    cat "$(get_state_file "$repo_path")" 2>/dev/null
+    cat "$(get_state_file "$repo_path")" 2>/dev/null || true
 }
 
 write_state() {
@@ -21,6 +21,38 @@ write_state() {
 clear_state() {
     local repo_path="${1:-$(pwd)}"
     rm -f "$(get_state_file "$repo_path")"
+}
+
+get_meta_file() {
+    local repo_path="${1:-$(pwd)}"
+    local base=$(get_base_name "$repo_path")
+    echo "$HOME/.claude-auto-code/${base}.meta"
+}
+
+write_meta() {
+    local key="$1"
+    local value="$2"
+    local repo_path="${3:-$(pwd)}"
+    local meta_file
+    meta_file=$(get_meta_file "$repo_path")
+    if [ -f "$meta_file" ] && grep -q "^${key}=" "$meta_file" 2>/dev/null; then
+        sed -i "s|^${key}=.*|${key}=${value}|" "$meta_file"
+    else
+        echo "${key}=${value}" >> "$meta_file"
+    fi
+}
+
+read_meta() {
+    local key="$1"
+    local repo_path="${2:-$(pwd)}"
+    local meta_file
+    meta_file=$(get_meta_file "$repo_path")
+    grep "^${key}=" "$meta_file" 2>/dev/null | cut -d= -f2- || true
+}
+
+clear_meta() {
+    local repo_path="${1:-$(pwd)}"
+    rm -f "$(get_meta_file "$repo_path")"
 }
 
 load_config() {

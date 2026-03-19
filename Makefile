@@ -25,8 +25,9 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*?##/ { printf "  $(BOLD)%-15s$(RESET) %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 	@printf "\n$(BOLD)QUICKSTART$(RESET)\n"
 	@printf "  make check        # verify all dependencies\n"
-	@printf "  make configure    # set up directories and install commands\n"
-	@printf "  make install      # add autocode to PATH\n"
+	@printf "  make configure    # set up data directory and config\n"
+	@printf "  make install      # add autocode to PATH and copy commands to ~/.claude/commands/\n"
+	@printf "  make commands     # copy commands to current project (.claude/commands/)\n"
 	@printf "\n$(BOLD)THEN, FROM ANY REPO$(RESET)\n"
 	@printf "  autocode plan \"Add feature X\"   # set requirements\n"
 	@printf "  autocode run                     # start the workflow\n"

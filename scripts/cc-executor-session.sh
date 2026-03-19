@@ -37,7 +37,7 @@ if [ "$current_state" = "executor:active" ]; then
     echo "💤 EXECUTOR session is idle, checking output"
     output=$(tmux capture-pane -S -50 -p -t "$session_name" 2>/dev/null)
     echo "$output"
-    if echo "$output" | grep -qE '^\s*READY_FOR_REVIEW\s*$'; then
+    if echo "$output" | grep -q 'READY_FOR_REVIEW'; then
         echo "📬 READY_FOR_REVIEW detected"
         write_state "executor:done"
         write_meta "updated_at" "$(date -Iseconds)"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-AUTOCODE_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+AUTOCODE_HOME="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/.." && pwd)"
 SCRIPTS_DIR="$AUTOCODE_HOME/scripts"
 
 source "$SCRIPTS_DIR/tmux-session.sh"
@@ -47,7 +47,6 @@ cmd_help() {
     echo ""
     echo "INSTALLATION"
     echo "  make install          # create symlink in ~/.local/bin"
-    echo "  npm link              # or install globally via npm"
     echo "  make check            # verify all dependencies"
     echo "  make configure        # set up required directories and commands"
 }

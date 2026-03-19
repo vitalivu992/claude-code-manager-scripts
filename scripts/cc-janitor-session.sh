@@ -1,12 +1,15 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-source $SCRIPT_DIR/tmux-session.sh
+source "$SCRIPT_DIR/tmux-session.sh"
 
-datadir="~/.ai-coding-team"
-mkdir -p $datadir
-current_dir=$(pwd)
-base_name=$(get_base_name $current_dir)
+datadir="$HOME/.ai-coding-team"
+mkdir -p "$datadir"
+base_name=$(get_base_name)
 session_name="${base_name}-JANITOR"
+
+LOCK_FILE="$datadir/${base_name}-JANITOR.lock"
+exec 200>"$LOCK_FILE"
+flock -n 200 || { echo "🔒 Another JANITOR instance is running, exiting"; exit 0; }
 
 executor_mail="$datadir/${base_name}-EXECUTOR.JANITOR.mail"
 
@@ -26,8 +29,14 @@ fi
 echo "✅ REVIEWER_APPROVED received, starting JANITOR tasks"
 
 create_session "JANITOR"
+
 send_command "JANITOR" "git-commit-generate"
+sleep 3
+while ! is_session_idle "JANITOR"; do sleep 5; done
+
 send_command "JANITOR" "git push"
+sleep 3
+while ! is_session_idle "JANITOR"; do sleep 5; done
 
 rm -f "$executor_mail"
 

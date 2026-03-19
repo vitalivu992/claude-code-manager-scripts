@@ -1,16 +1,19 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-source $SCRIPT_DIR/tmux-session.sh
+source "$SCRIPT_DIR/tmux-session.sh"
 
-datadir="~/.ai-coding-team"
-mkdir -p $datadir
-current_dir=$(pwd)
+datadir="$HOME/.ai-coding-team"
+mkdir -p "$datadir"
+base_name=$(get_base_name)
 
+LOCK_FILE="$datadir/${base_name}-PLANNER.lock"
+exec 200>"$LOCK_FILE"
+flock -n 200 || { echo "🔒 Another PLANNER instance is running, exiting"; exit 0; }
 
 function enter_planning_session() {
     echo "Entering the planning session..."
-    if [ -f $datadir/$session_name.PLANNER.mail ]; then
-        requirements=$(cat $datadir/$session_name.PLANNER.mail)
+    if [ -f "$datadir/${base_name}.PLANNER.mail" ]; then
+        requirements=$(cat "$datadir/${base_name}.PLANNER.mail")
         send_command "PLANNER" "claude-zaiglm /planner-create-plan $requirements"
     else
         send_command "PLANNER" "claude-zaiglm /planner-auto-plan"
@@ -18,9 +21,9 @@ function enter_planning_session() {
     capture_last_lines "PLANNER" 10
 }
 
-
 function extract_plan_file_path() {
-    tmux capture-pane -S -200 -p -t "$session_name" 2>/dev/null | grep "~/.claude/plans/" | awk '{print $NF}' | tail -1
+    local sn="${base_name}-PLANNER"
+    tmux capture-pane -S -200 -p -t "$sn" 2>/dev/null | grep "~/.claude/plans/" | awk '{print $NF}' | tail -1
     return 0
 }
 
@@ -28,7 +31,7 @@ for role in "EXECUTOR" "REVIEWER" "JANITOR"; do
     session_name=$(get_session_name "$role")
     if [ -n "$session_name" ]; then
         echo "❌ $role session exists"
-        capture_last_lines $role 10
+        capture_last_lines "$role" 10
         echo "---"
         echo "🔎 to enter the $role session, run tmux attach -t $session_name"
         exit 0
@@ -61,7 +64,8 @@ else
         exit 1
     fi
     echo "📄 plan file path: $plan_file_path"
-    echo "$plan_file_path" > $datadir/$session_name.EXECUTOR.mail
+    echo "$plan_file_path" > "$datadir/${base_name}-PLANNER.EXECUTOR.mail"
+    tmux kill-session -t "$session_name" 2>/dev/null
 fi
 
 exit 0

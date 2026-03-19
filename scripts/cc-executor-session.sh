@@ -1,12 +1,15 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-source $SCRIPT_DIR/tmux-session.sh
+source "$SCRIPT_DIR/tmux-session.sh"
 
-datadir="~/.ai-coding-team"
-mkdir -p $datadir
-current_dir=$(pwd)
-base_name=$(get_base_name $current_dir)
+datadir="$HOME/.ai-coding-team"
+mkdir -p "$datadir"
+base_name=$(get_base_name)
 session_name="${base_name}-EXECUTOR"
+
+LOCK_FILE="$datadir/${base_name}-EXECUTOR.lock"
+exec 200>"$LOCK_FILE"
+flock -n 200 || { echo "🔒 Another EXECUTOR instance is running, exiting"; exit 0; }
 
 planner_mail="$datadir/${base_name}-PLANNER.EXECUTOR.mail"
 reviewer_mail="$datadir/${base_name}-REVIEWER.EXECUTOR.mail"
@@ -27,6 +30,8 @@ if tmux has-session -t "$session_name" 2>/dev/null; then
         if [ -n "$plan_file_path" ]; then
             echo "📬 READY_FOR_REVIEW detected, writing to REVIEWER mail"
             echo "$plan_file_path" > "$datadir/${session_name}.REVIEWER.mail"
+            send_command "EXECUTOR" "/exit"
+            tmux kill-session -t "$session_name" 2>/dev/null
         else
             echo "❌ Could not find plan file path to write to REVIEWER mail"
         fi

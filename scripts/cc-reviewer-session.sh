@@ -1,12 +1,15 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-source $SCRIPT_DIR/tmux-session.sh
+source "$SCRIPT_DIR/tmux-session.sh"
 
-datadir="~/.ai-coding-team"
-mkdir -p $datadir
-current_dir=$(pwd)
-base_name=$(get_base_name $current_dir)
+datadir="$HOME/.ai-coding-team"
+mkdir -p "$datadir"
+base_name=$(get_base_name)
 session_name="${base_name}-REVIEWER"
+
+LOCK_FILE="$datadir/${base_name}-REVIEWER.lock"
+exec 200>"$LOCK_FILE"
+flock -n 200 || { echo "🔒 Another REVIEWER instance is running, exiting"; exit 0; }
 
 executor_mail="$datadir/${base_name}-EXECUTOR.REVIEWER.mail"
 
@@ -25,9 +28,13 @@ if tmux has-session -t "$session_name" 2>/dev/null; then
     if echo "$output" | grep -q "REVIEWER_APPROVED"; then
         echo "📬 REVIEWER_APPROVED detected, writing to EXECUTOR mail"
         echo "REVIEWER_APPROVED" > "$datadir/${session_name}.EXECUTOR.mail"
+        send_command "REVIEWER" "/exit"
+        tmux kill-session -t "$session_name" 2>/dev/null
     elif [ -n "$plan_gaps_path" ]; then
         echo "📬 Plan gaps file detected: $plan_gaps_path, writing to EXECUTOR mail"
         echo "$plan_gaps_path" > "$datadir/${session_name}.EXECUTOR.mail"
+        send_command "REVIEWER" "/exit"
+        tmux kill-session -t "$session_name" 2>/dev/null
     fi
     exit 0
 fi

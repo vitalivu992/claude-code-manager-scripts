@@ -53,7 +53,9 @@ if [ -z "$plan_file_path" ]; then
 fi
 
 create_session "REVIEWER"
-send_command "REVIEWER" "$AUTOCODE_CMD_REVIEWER /reviewer-review-impl-gaps $plan_file_path"
+send_command "REVIEWER" "$AUTOCODE_CMD_REVIEWER"
+sleep 10
+send_command "REVIEWER" "/reviewer-review-impl-gaps $plan_file_path"
 rm -f "$executor_mail"
 
 exit 0

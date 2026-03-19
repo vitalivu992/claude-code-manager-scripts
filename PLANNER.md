@@ -17,7 +17,7 @@ All state is under `~/.claude-auto-code/`, keyed by the current working director
 Run from the repo you want to plan (so `pwd` is that repo):
 
 ```cron
-*/5 * * * * cd /path/to/your/repo && /path/to/workspace/skills/claude-auto-code/scripts/cc-planner-session.sh
+*/5 * * * * cd /path/to/your/repo && /path/to/autocode-scripts/scripts/cc-planner-session.sh
 ```
 
 Use the real path to the script and ensure the cron environment can see `tmux` and `claude` (or adjust `PATH` in the cron job).
@@ -38,7 +38,7 @@ If there is **no** PLANNER session for this repo:
 - Creates a detached tmux session named `<repo-base>-PLANNER` (e.g. `home-ltvu-myproject-PLANNER`).
 - Enters the planning session:
   - If `~/.claude-auto-code/<base_name>.PLANNER.mail` exists: runs  
-    `claude /planner-create-plan <contents of .PLANNER.mail>`.
+    `claude /planner-create-plan <contents of .PLANNER.mail>` then deletes the mail file.
   - Otherwise: runs `claude /planner-auto-plan`.
 - Captures and prints the last 10 lines of the PLANNER pane.
 - Exits. The planner keeps running in tmux; the next cron run will see the session.

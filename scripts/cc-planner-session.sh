@@ -15,6 +15,7 @@ function enter_planning_session() {
     echo "Entering the planning session..."
     if [ -f "$datadir/${base_name}.PLANNER.mail" ]; then
         requirements=$(cat "$datadir/${base_name}.PLANNER.mail")
+        rm -f "$datadir/${base_name}.PLANNER.mail"
         send_command "PLANNER" "$AUTOCODE_CMD_PLANNER /planner-create-plan $requirements"
     else
         send_command "PLANNER" "$AUTOCODE_CMD_PLANNER /planner-auto-plan"

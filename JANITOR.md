@@ -13,7 +13,7 @@ All state is under `~/.claude-auto-code/`, keyed by the current working director
 Run from the repo (so `pwd` is that repo):
 
 ```cron
-*/5 * * * * cd /path/to/your/repo && /path/to/workspace/skills/claude-auto-code/scripts/cc-janitor-session.sh
+*/5 * * * * cd /path/to/your/repo && /path/to/autocode-scripts/scripts/cc-janitor-session.sh
 ```
 
 ## What the script does each run
@@ -31,12 +31,12 @@ If the mail exists but does not contain `REVIEWER_APPROVED`, the script logs the
 When the EXECUTOR writes `REVIEWER_APPROVED` to the mail box:
 
 1. Creates the JANITOR tmux session.
-2. Sends `git-commit-generate` to the JANITOR session and waits for it to complete (polls until idle).
-3. Sends `git push` to the JANITOR session and waits for it to complete (polls until idle).
-4. Removes the JANITOR mail.
+2. Sends `$AUTOCODE_CMD_JANITOR -p /git-commit` (default: `claude -p /git-commit`) and waits for it to complete (polls until idle).
+3. Sends `$AUTOCODE_CMD_GIT push` (default: `git push`) and waits for it to complete (polls until idle).
+4. Removes the JANITOR mail, the persistent `.EXECUTOR.plan` file, and all role lock files.
 5. Iterates over all four roles — PLANNER, EXECUTOR, REVIEWER, JANITOR — and kills each tmux session that still exists.
 
-After step 5, no workflow tmux sessions remain and the repo has been committed and pushed.
+After step 5, no workflow tmux sessions remain, state files are cleaned up, and the repo has been committed and pushed.
 
 ## Data directory and files
 
@@ -50,12 +50,11 @@ After step 5, no workflow tmux sessions remain and the repo has been committed a
 ## End-to-end flow with cron every 5 minutes
 
 1. **Runs before approval:** No mail → exit.
-2. **First run after EXECUTOR writes mail:** Mail contains `REVIEWER_APPROVED` → create session, commit, push, kill all sessions. Exit.
+2. **First run after EXECUTOR writes mail:** Mail contains `REVIEWER_APPROVED` → create session, commit, push, clean up state files, kill all sessions. Exit.
 3. **Subsequent runs:** No mail (already deleted) → exit.
 
 ## Dependencies
 
 - **tmux:** session creation and key sending.
 - **tmux-session.sh:** provides `get_base_name`, `create_session`, `send_command`, `is_session_idle`.
-- **git-commit-generate:** generates and commits changes; must be available in the tmux session's `PATH`.
-- **git:** used directly for `git push`.
+- **git:** used for `git push` (configurable via `AUTOCODE_CMD_GIT`).

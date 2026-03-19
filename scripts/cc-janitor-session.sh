@@ -31,15 +31,19 @@ echo "✅ REVIEWER_APPROVED received, starting JANITOR tasks"
 
 create_session "JANITOR"
 
-send_command "JANITOR" "git-commit-generate"
+send_command "JANITOR" "$AUTOCODE_CMD_JANITOR -p \"/git-commit\""
 sleep 3
 while ! is_session_idle "JANITOR"; do sleep 5; done
 
-send_command "JANITOR" "mygit push"
+send_command "JANITOR" "$AUTOCODE_CMD_GIT push"
 sleep 3
 while ! is_session_idle "JANITOR"; do sleep 5; done
 
 rm -f "$executor_mail"
+rm -f "$datadir/${base_name}.EXECUTOR.plan"
+for lock in "$datadir/${base_name}"-*.lock; do
+    [ -f "$lock" ] && rm -f "$lock"
+done
 
 echo "🧹 Terminating all workflow sessions..."
 for role in "PLANNER" "EXECUTOR" "REVIEWER" "JANITOR"; do

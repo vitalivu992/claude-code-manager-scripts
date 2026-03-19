@@ -6,18 +6,25 @@ load_config
 datadir="$HOME/.claude-auto-code"
 mkdir -p "$datadir"
 base_name=$(get_base_name)
+
+LOCK_FILE="$datadir/${base_name}.lock"
+exec 200>"$LOCK_FILE"
+flock -n 200 || { echo "🔒 Another role is running, exiting"; exit 0; }
+
+current_state=$(read_state)
+case "$current_state" in
+    planner:done|executor:active|reviewer:gaps) ;;
+    *) echo "Not EXECUTOR's turn (state: $current_state)"; exit 0 ;;
+esac
+
 session_name="${base_name}-EXECUTOR"
 
-LOCK_FILE="$datadir/${base_name}-EXECUTOR.lock"
-exec 200>"$LOCK_FILE"
-flock -n 200 || { echo "🔒 Another EXECUTOR instance is running, exiting"; exit 0; }
+if [ "$current_state" = "executor:active" ]; then
+    if ! tmux has-session -t "$session_name" 2>/dev/null; then
+        echo "❌ EXECUTOR session disappeared while state is executor:active"
+        exit 1
+    fi
 
-planner_mail="$datadir/${base_name}-PLANNER.EXECUTOR.mail"
-reviewer_mail="$datadir/${base_name}-REVIEWER.EXECUTOR.mail"
-executor_plan="$datadir/${base_name}.EXECUTOR.plan"
-
-if tmux has-session -t "$session_name" 2>/dev/null; then
-    echo "✅ EXECUTOR session exists"
     if ! is_session_idle "EXECUTOR"; then
         echo "⏳ EXECUTOR session is still active, exiting"
         exit 0
@@ -27,69 +34,36 @@ if tmux has-session -t "$session_name" 2>/dev/null; then
     output=$(tmux capture-pane -S -50 -p -t "$session_name" 2>/dev/null)
     echo "$output"
     if echo "$output" | grep -qE '^\s*READY_FOR_REVIEW\s*$'; then
-        plan_file_path=$(cat "$executor_plan" 2>/dev/null)
-        if [ -n "$plan_file_path" ]; then
-            echo "📬 READY_FOR_REVIEW detected, writing to REVIEWER mail"
-            echo "$plan_file_path" > "$datadir/${session_name}.REVIEWER.mail"
-            send_command "EXECUTOR" "/exit"
-            tmux kill-session -t "$session_name" 2>/dev/null
-        else
-            echo "❌ Could not find plan file path to write to REVIEWER mail"
-        fi
+        echo "📬 READY_FOR_REVIEW detected"
+        write_state "executor:done"
+        write_meta "updated_at" "$(date -Iseconds)"
+        send_command "EXECUTOR" "/exit"
+        tmux kill-session -t "$session_name" 2>/dev/null
     fi
     exit 0
 fi
 
-if [ -f "$reviewer_mail" ]; then
-    mail_content=$(cat "$reviewer_mail")
-
-    if echo "$mail_content" | grep -qE '^\s*REVIEWER_APPROVED\s*$'; then
-        echo "✅ REVIEWER_APPROVED received, forwarding to JANITOR"
-        echo "REVIEWER_APPROVED" > "$datadir/${session_name}.JANITOR.mail"
-        rm -f "$reviewer_mail"
-        exit 0
-    fi
-
-    if echo "$mail_content" | grep -q "~/.claude/plans/"; then
-        plan_gaps_file_path=$(echo "$mail_content" | grep "~/.claude/plans/" | awk '{print $NF}')
-        plan_file_path=$(cat "$executor_plan" 2>/dev/null)
-
-        if [ -z "$plan_file_path" ]; then
-            echo "❌ Could not find original plan file path from $executor_plan"
-            rm -f "$reviewer_mail"
-            exit 1
-        fi
-
-        create_session "EXECUTOR"
-        send_command "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR"
-        sleep 10
-        send_command "EXECUTOR" "/ralph-loop:ralph-loop \"review the code changes, existing source code, documents and the plan $plan_file_path and the gaps documented and plan in $plan_gaps_file_path, review if the gaps are valid or not, then fix the necessary gaps, make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""
-        rm -f "$reviewer_mail"
-        exit 0
-    fi
-
-    echo "❌ Unexpected content in REVIEWER mail: $mail_content"
-    rm -f "$reviewer_mail"
+plan_file_path=$(read_meta "plan_path")
+if [ -z "$plan_file_path" ]; then
+    echo "❌ No plan_path in metadata"
     exit 1
 fi
 
-if [ -f "$planner_mail" ]; then
-    plan_file_path=$(cat "$planner_mail" | grep "~/.claude/plans/" | awk '{print $NF}')
-    if [ -z "$plan_file_path" ]; then
-        echo "❌ Could not extract plan file path from PLANNER mail"
-        # TODO inform user via telegram
-        exit 1
-    fi
+create_session "EXECUTOR"
+send_command "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR"
+sleep 10
 
-    echo "$plan_file_path" > "$executor_plan"
-
-    create_session "EXECUTOR"
-    send_command "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR"
-    sleep 10
+if [ "$current_state" = "reviewer:gaps" ]; then
+    gaps_path=$(read_meta "gaps_path")
+    review_iteration=$(read_meta "review_iteration")
+    review_iteration=$((${review_iteration:-0} + 1))
+    write_meta "review_iteration" "$review_iteration"
+    send_command "EXECUTOR" "/ralph-loop:ralph-loop \"review the code changes, existing source code, documents and the plan $plan_file_path and the gaps documented and plan in $gaps_path, review if the gaps are valid or not, then fix the necessary gaps, make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""
+else
+    write_meta "review_iteration" "0"
     send_command "EXECUTOR" "/ralph-loop:ralph-loop \"review existing source code, documents and execute the plan $plan_file_path, make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""
-    rm -f "$planner_mail"
-    exit 0
 fi
 
-echo "📭 No mail for EXECUTOR, exiting"
+write_state "executor:active"
+write_meta "updated_at" "$(date -Iseconds)"
 exit 0

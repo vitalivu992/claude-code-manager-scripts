@@ -24,16 +24,23 @@ cmd_help() {
     echo "  claude-code-manager <command> [args]"
     echo ""
     echo "COMMANDS"
-    printf "  %-30s %s\n" 'plan "<requirement>"' 'Set requirements for the PLANNER (creates mail file)'
-    printf "  %-30s %s\n" 'run [--once]'          'Run the full workflow loop (or a single tick with --once)'
-    printf "  %-30s %s\n" 'retry [--once]'        'Resume workflow from current state (kills stale sessions, retries)'
+    printf "  %-30s %s\n" 'init'                   'Copy workflow commands into .claude/commands/ of the current repo'
+    printf "  %-30s %s\n" 'plan "<requirement>"'   'Set requirements for the PLANNER (creates mail file)'
+    printf "  %-30s %s\n" 'set-plan <file>'        'Skip PLANNER: use an existing plan file and jump to executor'
+    printf "  %-30s %s\n" 'run [--once]'           'Run the full workflow loop (or a single tick with --once)'
+    printf "  %-30s %s\n" 'retry [--once]'         'Resume workflow from current state (kills stale sessions, retries)'
     printf "  %-30s %s\n" 'status'                 'Show workflow state, metadata, and active sessions'
     printf "  %-30s %s\n" 'stop'                   'Kill all workflow sessions and clean up state files'
     printf "  %-30s %s\n" 'help'                   'Show this help message'
     echo ""
     echo "QUICKSTART"
     echo "  cd /path/to/your/repo"
+    echo "  claude-code-manager init               # copy commands into repo"
     echo "  claude-code-manager plan \"Add user authentication with OAuth\""
+    echo "  claude-code-manager run"
+    echo ""
+    echo "SKIP PLANNER (use existing plan)"
+    echo "  claude-code-manager set-plan /path/to/plan.md"
     echo "  claude-code-manager run"
     echo ""
     echo "RETRY (resume after failure)"
@@ -41,12 +48,13 @@ cmd_help() {
     echo "  claude-code-manager retry --once       # resume and run a single tick"
     echo ""
     echo "OPTIONS"
-    printf "  %-30s %s\n" 'AUTOCODE_INTERVAL=<seconds>' "Polling interval for 'run' (default: $AUTOCODE_INTERVAL)"
-    printf "  %-30s %s\n" 'AUTOCODE_CMD_PLANNER=<cmd>'  "Claude command for PLANNER role (default: $AUTOCODE_CMD_PLANNER)"
-    printf "  %-30s %s\n" 'AUTOCODE_CMD_EXECUTOR=<cmd>' "Claude command for EXECUTOR role (default: $AUTOCODE_CMD_EXECUTOR)"
-    printf "  %-30s %s\n" 'AUTOCODE_CMD_REVIEWER=<cmd>' "Claude command for REVIEWER role (default: $AUTOCODE_CMD_REVIEWER)"
-    printf "  %-30s %s\n" 'AUTOCODE_CMD_JANITOR=<cmd>'  "Commit command for JANITOR role (default: $AUTOCODE_CMD_JANITOR)"
-    printf "  %-30s %s\n" 'AUTOCODE_CMD_GIT=<cmd>'      "Git command for JANITOR push (default: $AUTOCODE_CMD_GIT)"
+    printf "  %-30s %s\n" 'AUTOCODE_INTERVAL=<seconds>'  "Polling interval for 'run' (default: $AUTOCODE_INTERVAL)"
+    printf "  %-30s %s\n" 'AUTOCODE_CMD_PLANNER=<cmd>'   "Claude command for PLANNER role (default: $AUTOCODE_CMD_PLANNER)"
+    printf "  %-30s %s\n" 'AUTOCODE_CMD_EXECUTOR=<cmd>'  "Claude command for EXECUTOR role (default: $AUTOCODE_CMD_EXECUTOR)"
+    printf "  %-30s %s\n" 'AUTOCODE_CMD_REVIEWER=<cmd>'  "Claude command for REVIEWER role (default: $AUTOCODE_CMD_REVIEWER)"
+    printf "  %-30s %s\n" 'AUTOCODE_CMD_JANITOR=<cmd>'   "Commit command for JANITOR role (default: $AUTOCODE_CMD_JANITOR)"
+    printf "  %-30s %s\n" 'AUTOCODE_CMD_GIT=<cmd>'       "Git command for JANITOR push (default: $AUTOCODE_CMD_GIT)"
+    printf "  %-30s %s\n" 'AUTOCODE_GIT_PUSH=true|false' "Whether JANITOR pushes after commit (default: $AUTOCODE_GIT_PUSH)"
     echo ""
     echo "  Persistent config: ~/.claude-auto-code/config (created by 'make configure')"
     echo ""
@@ -55,6 +63,73 @@ cmd_help() {
     echo "  make check            # verify all dependencies"
     echo "  make configure        # set up required directories and commands"
 
+}
+
+cmd_init() {
+    if [ ! -d "$(pwd)/.git" ]; then
+        _red "Error: $(pwd) is not a git repository (.git not found)"
+        exit 1
+    fi
+
+    local dest="$(pwd)/.claude/commands"
+    mkdir -p "$dest"
+
+    local copied=0
+    local skipped=0
+    for src in "$AUTOCODE_HOME/commands/"*.md; do
+        [ -f "$src" ] || continue
+        local fname
+        fname=$(basename "$src")
+        local target="$dest/$fname"
+        if [ -f "$target" ]; then
+            _yellow "  ~ Skipped (already exists): $fname"
+            skipped=$((skipped + 1))
+        else
+            cp "$src" "$target"
+            _green "  + Copied: $fname"
+            copied=$((copied + 1))
+        fi
+    done
+
+    echo ""
+    echo "Commands directory: $dest"
+    echo "Copied: $copied  Skipped: $skipped"
+    if [ "$skipped" -gt 0 ]; then
+        echo "Tip: remove existing files and re-run to overwrite."
+    fi
+}
+
+cmd_set_plan() {
+    local plan_path="${1:-}"
+
+    if [ -z "$plan_path" ]; then
+        _red "Error: plan file path is required"
+        echo "Usage: claude-code-manager set-plan <path/to/plan.md>"
+        exit 1
+    fi
+
+    local abs_path
+    abs_path=$(realpath "$plan_path" 2>/dev/null || true)
+
+    if [ -z "$abs_path" ] || [ ! -f "$abs_path" ]; then
+        _red "Error: plan file not found: $plan_path"
+        exit 1
+    fi
+
+    local current_state
+    current_state=$(read_state)
+    if [ -n "$current_state" ]; then
+        _red "Error: workflow already in progress (state: $current_state)"
+        echo "Run 'claude-code-manager stop' to abort the current workflow first."
+        exit 1
+    fi
+
+    write_state "planner:done"
+    write_meta "plan_path" "$abs_path"
+    write_meta "updated_at" "$(date -Iseconds)"
+
+    _green "Plan set: $abs_path"
+    echo "Run 'claude-code-manager run' to start the executor."
 }
 
 cmd_plan() {
@@ -224,6 +299,7 @@ cmd_status() {
     printf "  %-10s %s\n" "REVIEWER" "$AUTOCODE_CMD_REVIEWER"
     printf "  %-10s %s\n" "JANITOR"  "$AUTOCODE_CMD_JANITOR"
     printf "  %-10s %s\n" "GIT"      "$AUTOCODE_CMD_GIT"
+    printf "  %-10s %s\n" "GIT_PUSH" "$AUTOCODE_GIT_PUSH"
     echo ""
 
     _bold "Workflow state:"
@@ -315,7 +391,9 @@ COMMAND="${1:-help}"
 shift || true
 
 case "$COMMAND" in
+    init)     cmd_init ;;
     plan)     cmd_plan "$@" ;;
+    set-plan) cmd_set_plan "$@" ;;
     run)      cmd_run "$@" ;;
     retry)    cmd_retry "$@" ;;
     status)   cmd_status ;;

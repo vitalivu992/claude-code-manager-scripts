@@ -63,6 +63,7 @@ load_config() {
     AUTOCODE_CMD_REVIEWER="${AUTOCODE_CMD_REVIEWER:-claude}"
     AUTOCODE_CMD_JANITOR="${AUTOCODE_CMD_JANITOR:-claude}"
     AUTOCODE_CMD_GIT="${AUTOCODE_CMD_GIT:-git}"
+    AUTOCODE_GIT_PUSH="${AUTOCODE_GIT_PUSH:-true}"
 }
 
 acquire_role_lock() {

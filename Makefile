@@ -52,7 +52,7 @@ configure: ## Create data directory and default config file
 	@mkdir -p "$(DATADIR)"
 	@printf "  $(OK) Created $(DATADIR)\n"
 	@if [ ! -f "$(DATADIR)/config" ]; then \
-		printf '# claude-code-manager per-role command configuration\n# Set the CLI command to use for each role.\n# Environment variables take precedence over this file.\n\nAUTOCODE_CMD_PLANNER=claude\nAUTOCODE_CMD_EXECUTOR=claude\nAUTOCODE_CMD_REVIEWER=claude\nAUTOCODE_CMD_JANITOR=claude\nAUTOCODE_CMD_GIT=git\n' > "$(DATADIR)/config"; \
+		printf '# claude-code-manager per-role command configuration\n# Set the CLI command to use for each role.\n# Environment variables take precedence over this file.\n\nAUTOCODE_CMD_PLANNER=claude\nAUTOCODE_CMD_EXECUTOR=claude\nAUTOCODE_CMD_REVIEWER=claude\nAUTOCODE_CMD_JANITOR=claude\nAUTOCODE_CMD_GIT=git\nAUTOCODE_GIT_PUSH=true\n' > "$(DATADIR)/config"; \
 		printf "  $(OK) Created $(DATADIR)/config\n"; \
 	else \
 		printf "  $(YELLOW)~$(RESET) $(DATADIR)/config already exists, skipping\n"; \

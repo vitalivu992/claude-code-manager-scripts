@@ -35,8 +35,8 @@ All state lives under `~/.claude-auto-code/`, keyed by a base name derived from 
 | `reviewer:active` | REVIEWER | Polls for approval or gaps |
 | `reviewer:approved` | JANITOR | Starts commit session |
 | `reviewer:gaps` | EXECUTOR | Starts gap-fix iteration |
-| `janitor:commit` | JANITOR | Polls for commit completion, then pushes |
-| `janitor:push` | JANITOR | Polls for push completion, then cleans up |
+| `janitor:commit` | JANITOR | Polls for commit completion, then pushes (if `AUTOCODE_GIT_PUSH=true`) |
+| `janitor:push` | JANITOR | Polls for push completion, then cleans up (skipped when `AUTOCODE_GIT_PUSH=false`) |
 
 ---
 
@@ -189,8 +189,8 @@ All state lives under `~/.claude-auto-code/`, keyed by a base name derived from 
 **State is `janitor:commit` → push**
 
 - Verifies the JANITOR session exists and is idle.
-- Sends `$AUTOCODE_CMD_GIT push`.
-- Writes state `janitor:push`.
+- If `AUTOCODE_GIT_PUSH=true` (default): sends `$AUTOCODE_CMD_GIT push` and writes state `janitor:push`.
+- If `AUTOCODE_GIT_PUSH=false`: skips push, immediately clears state/metadata, removes `.lockdir`, and kills all sessions.
 
 **State is `janitor:push` → clean up**
 
@@ -204,7 +204,7 @@ After cleanup, no workflow sessions remain, all state files are removed, and the
 ### Commands used
 
 - `/git-commit` — commits all staged changes in the JANITOR session
-- `$AUTOCODE_CMD_GIT push` — pushes to remote (default: `git push`)
+- `$AUTOCODE_CMD_GIT push` — pushes to remote (default: `git push`); skipped when `AUTOCODE_GIT_PUSH=false`
 
 ---
 
@@ -228,4 +228,4 @@ The library functions used across roles:
 | `capture_last_lines ROLE [N] [path]` | Capture last N lines from a role's pane |
 | `read_state / write_state / clear_state` | Workflow state I/O |
 | `read_meta / write_meta / clear_meta` | Metadata key-value I/O |
-| `load_config` | Load `~/.claude-auto-code/config` and set `AUTOCODE_CMD_*` defaults |
+| `load_config` | Load `~/.claude-auto-code/config` and set `AUTOCODE_CMD_*` and `AUTOCODE_GIT_PUSH` defaults |

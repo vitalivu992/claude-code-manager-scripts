@@ -45,6 +45,22 @@ if [ "$current_state" = "janitor:commit" ] || [ "$current_state" = "janitor:push
             exit 0
         fi
 
+        if [ "${AUTOCODE_GIT_PUSH:-true}" != "true" ]; then
+            echo "⏭️  git push disabled (AUTOCODE_GIT_PUSH!=true), skipping push"
+            clear_state
+            clear_meta
+            rm -rf "$datadir/${base_name}.lockdir"
+            echo "🧹 Terminating all workflow sessions..."
+            for role in "PLANNER" "EXECUTOR" "REVIEWER" "JANITOR"; do
+                role_session="${base_name}-${role}"
+                if tmux has-session -t "$role_session" 2>/dev/null; then
+                    tmux kill-session -t "$role_session"
+                    echo "🛑 Killed session: $role_session"
+                fi
+            done
+            exit 0
+        fi
+
         echo "💬 git-commit done, running git push"
         write_state "janitor:push"
         write_meta "updated_at" "$(date -Iseconds)"

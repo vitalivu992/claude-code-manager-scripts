@@ -7,9 +7,9 @@ source "$REPO_DIR/scripts/tmux-session.sh"
 setup_test_env
 cd "$TEST_REPO"
 
-AUTOCODE="$REPO_DIR/bin/autocode"
+AUTOCODE="$REPO_DIR/bin/claude-code-manager"
 
-describe "autocode retry — no state"
+describe "claude-code-manager retry — no state"
 
 it "retry exits with error when no state exists"
 clear_state "$TEST_REPO"
@@ -17,7 +17,7 @@ output=$("$AUTOCODE" retry --once 2>&1 || true)
 echo "$output" | grep -q "No workflow state found"
 assert_exit_code "0" "$?" "reports no workflow state"
 
-describe "autocode retry — planner:active"
+describe "claude-code-manager retry — planner:active"
 
 it "retry from planner:active restores PLANNER.mail from metadata"
 write_state "planner:active" "$TEST_REPO"
@@ -36,7 +36,7 @@ write_meta "requirements" "Build OAuth" "$TEST_REPO"
 "$AUTOCODE" retry --once 2>&1 >/dev/null || true
 assert_eq "true" "true" "retry ran without crash"
 
-describe "autocode retry — state rollback logic"
+describe "claude-code-manager retry — state rollback logic"
 
 it "retry from executor:active without gaps rolls back to planner:done"
 write_state "executor:active" "$TEST_REPO"
@@ -74,7 +74,7 @@ output=$("$AUTOCODE" retry --once 2>&1 || true)
 echo "$output" | grep -q "Retry conditions restored"
 assert_exit_code "0" "$?" "janitor:push rolls back"
 
-describe "autocode retry — passthrough states"
+describe "claude-code-manager retry — passthrough states"
 
 for state in "planner:done" "executor:done" "reviewer:approved" "reviewer:gaps"; do
     it "retry from $state proceeds without rollback"
@@ -85,7 +85,7 @@ for state in "planner:done" "executor:done" "reviewer:approved" "reviewer:gaps";
     assert_exit_code "0" "$?" "$state passes through"
 done
 
-describe "autocode retry — unknown state"
+describe "claude-code-manager retry — unknown state"
 
 it "retry from unknown state reports error"
 write_state "bogus:state" "$TEST_REPO"

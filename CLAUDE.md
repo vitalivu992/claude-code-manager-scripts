@@ -44,9 +44,9 @@ All roles share a single state file (`${base}.state`) that drives the workflow:
 | `janitor:commit` | JANITOR | Polling for commit completion |
 | `janitor:push` | JANITOR | Polling for push completion |
 
-### Concurrency: Single Flock
+### Concurrency: Directory-Based Mutex
 
-All role scripts share one lock file (`${base}.lock`). At most one role script runs at a time. Each script acquires the lock, checks the state, acts if it's their turn, and releases the lock on exit.
+All role scripts share one lock directory (`${base}.lockdir`). At most one role script runs at a time. Each script calls `acquire_role_lock`, which atomically creates the directory via `mkdir`, writes its PID, acts if it's their turn, and removes the directory on exit via a trap.
 
 ### Tmux Session Naming
 
@@ -58,7 +58,7 @@ All files reside in `~/.claude-auto-code/`:
 
 | File Pattern | Purpose |
 |--------------|---------|
-| `{base}.lock` | Shared flock for all roles (prevents concurrent execution) |
+| `{base}.lockdir/pid` | Directory-based mutex for all roles (prevents concurrent execution); holds PID of the active role |
 | `{base}.state` | Current workflow state (single value from the state machine) |
 | `{base}.meta` | Key=value metadata: `plan_path`, `gaps_path`, `requirements`, `review_iteration`, `updated_at` |
 | `{base}.PLANNER.mail` | User-facing only: requirements for plan creation (written by `claude-code-manager plan`) |
@@ -125,16 +125,13 @@ claude-code-manager retry --once   # resume and run a single tick
 
 ### Using cron (advanced)
 
-Add entries to crontab (`crontab -e`):
+Add an entry to crontab (`crontab -e`):
 
 ```cron
-*/5 * * * * cd /path/to/your/repo && /path/to/claude-code-manager-scripts/scripts/cc-planner-session.sh
-*/5 * * * * cd /path/to/your/repo && /path/to/claude-code-manager-scripts/scripts/cc-executor-session.sh
-*/5 * * * * cd /path/to/your/repo && /path/to/claude-code-manager-scripts/scripts/cc-reviewer-session.sh
-*/5 * * * * cd /path/to/your/repo && /path/to/claude-code-manager-scripts/scripts/cc-janitor-session.sh
+*/5 * * * * cd /path/to/your/repo && claude-code-manager run --once
 ```
 
-With the shared flock, only one role script executes per cron cycle. Each script exits immediately if it's not their turn (based on state).
+`--once` runs a single tick per cron invocation; the `.lockdir` mutex ensures only one execution runs at a time even if cron fires while a previous tick is still in progress.
 
 When using cron, provide requirements manually:
 
@@ -162,18 +159,14 @@ Runs three test suites:
 ## Dependencies
 
 - **tmux**: Session management
-- **flock** (from `util-linux`): Concurrency protection (single lock per repo)
 - **realpath** (from `coreutils`): Resolves absolute repo paths for session naming
 - **claude**: Claude Code CLI (used within sessions for `/ralph-loop`, `/planner-*`, `/reviewer-*`)
 - **git**: Version control (configurable via `AUTOCODE_CMD_GIT`)
 
 ## Role Documentation
 
-Each role has detailed documentation in the repository root:
-- `PLANNER.md` - Planner workflow details
-- `EXECUTOR.md` - Executor workflow details
-- `REVIEWER.md` - Reviewer workflow details
-- `JANITOR.md` - Janitor workflow details
+All four roles are documented in a single unified reference:
+- `WORKFLOW.md` — PLANNER, EXECUTOR, REVIEWER, JANITOR workflow details
 
 ## Configuration
 
@@ -201,6 +194,7 @@ Run `claude-code-manager status` to see which commands are currently active for 
 
 `scripts/tmux-session.sh` provides shared utilities:
 - `get_base_name [path]` - Convert repo path to session base name
+- `acquire_role_lock ROLE BASE_NAME` - Directory-based mutex via `mkdir` on a `.lockdir`; writes PID; sets `EXIT` trap to remove it
 - `create_session ROLE [path]` - Create a tmux session for a role
 - `send_command ROLE "cmd" [path]` - Send command to a role's session
 - `capture_last_lines ROLE [length] [path]` - Capture and print last N lines

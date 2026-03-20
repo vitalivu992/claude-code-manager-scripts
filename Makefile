@@ -43,11 +43,9 @@ check: ## Check all required and optional dependencies
 		fi; \
 	}; \
 	_check tmux          "tmux"              "apt install tmux"; \
-	_check flock         "flock (util-linux)" "apt install util-linux"; \
 	_check git           "git"               "apt install git"; \
 	_check realpath      "realpath (coreutils)" "apt install coreutils"; \
-	_check claude "claude"     "install Claude Code CLI and add alias"; \
-	_check git "git" "apt install git"
+	_check claude "claude"     "install Claude Code CLI and add alias";
 
 configure: ## Create data directory and default config file
 	@printf "$(BOLD)Configuring claude-code-manager-scripts...$(RESET)\n"

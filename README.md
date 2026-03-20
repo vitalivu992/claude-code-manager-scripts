@@ -21,12 +21,11 @@ PLANNER ──planner:done──> EXECUTOR ──executor:done──> REVIEWER
 | **REVIEWER** | Audits the implementation; either approves or documents gaps |
 | **JANITOR** | Commits, pushes, and tears down all workflow sessions |
 
-Each role runs in its own tmux session. A shared flock ensures only one role executes at a time. All coordination state lives in `~/.claude-auto-code/`.
+Each role runs in its own tmux session. A directory-based mutex (`.lockdir`) ensures only one role executes at a time. All coordination state lives in `~/.claude-auto-code/`.
 
 ## Prerequisites
 
 - **tmux** — session management (`apt install tmux`)
-- **flock** — concurrency lock (`apt install util-linux`)
 - **git** — version control (`apt install git`)
 - **realpath** — path resolution (`apt install coreutils`)
 - **claude** — [Claude Code CLI](https://claude.ai/code)
@@ -41,7 +40,7 @@ make check
 
 ```bash
 # 1. Clone the repo
-git https://github.com/vitalivu992/claude-code-manager-scripts.git ~/claude-code-manager-scripts
+git clone https://github.com/vitalivu992/claude-code-manager-scripts.git ~/claude-code-manager-scripts
 cd ~/claude-code-manager-scripts
 
 # 2. Check dependencies
@@ -162,11 +161,13 @@ claude-code-manager retry --once # single tick, useful for debugging
 
 ## Using with Cron (Advanced)
 
-For unattended operation, add each role script to crontab:
+For unattended operation, add a single entry to crontab:
 
 ```cron
-0,30 * * * * cd /path/to/your/repo && claude-code-manager run
+*/5 * * * * cd /path/to/your/repo && claude-code-manager run --once
 ```
+
+`--once` runs a single workflow tick per cron invocation. The `.lockdir` mutex ensures only one execution runs at a time even if cron fires while a previous tick is still active.
 
 
 ## State Machine Reference
@@ -196,7 +197,7 @@ State and metadata files at runtime (`~/.claude-auto-code/`):
 
 | File | Purpose |
 |------|---------|
-| `<base>.lock` | Shared flock — prevents concurrent role execution |
+| `<base>.lockdir/pid` | Directory-based mutex — prevents concurrent role execution |
 | `<base>.state` | Current workflow state |
 | `<base>.meta` | Key-value metadata (`plan_path`, `gaps_path`, `review_iteration`, …) |
 | `<base>.PLANNER.mail` | Requirement text consumed on first PLANNER run |

@@ -1,6 +1,6 @@
 # Reviewer workflow (cc-reviewer-session.sh)
 
-This describes how the reviewer works when you run `scripts/cc-reviewer-session.sh` via cron or `autocode run`.
+This describes how the reviewer works when you run `scripts/cc-reviewer-session.sh` via cron or `claude-code-manager run`.
 
 ## Overview
 

@@ -1,6 +1,6 @@
 # Executor workflow (cc-executor-session.sh)
 
-This describes how the executor works when you run `scripts/cc-executor-session.sh` via cron or `autocode run`.
+This describes how the executor works when you run `scripts/cc-executor-session.sh` via cron or `claude-code-manager run`.
 
 ## Overview
 

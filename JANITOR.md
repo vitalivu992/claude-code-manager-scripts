@@ -1,6 +1,6 @@
 # Janitor workflow (cc-janitor-session.sh)
 
-This describes how the janitor works when you run `scripts/cc-janitor-session.sh` via cron or `autocode run`.
+This describes how the janitor works when you run `scripts/cc-janitor-session.sh` via cron or `claude-code-manager run`.
 
 ## Overview
 

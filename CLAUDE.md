@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This repository implements a **multi-agent AI coding workflow** that orchestrates four specialized roles (PLANNER, EXECUTOR, REVIEWER, JANITOR) through tmux sessions and a shared state file. The workflow is designed to be run via cron or the `autocode` CLI, enabling autonomous software development with Claude Code.
+This repository implements a **multi-agent AI coding workflow** that orchestrates four specialized roles (PLANNER, EXECUTOR, REVIEWER, JANITOR) through tmux sessions and a shared state file. The workflow is designed to be run via cron or the `claude-code-manager` CLI, enabling autonomous software development with Claude Code.
 
 ### Architecture
 
@@ -61,7 +61,7 @@ All files reside in `~/.claude-auto-code/`:
 | `{base}.lock` | Shared flock for all roles (prevents concurrent execution) |
 | `{base}.state` | Current workflow state (single value from the state machine) |
 | `{base}.meta` | Key=value metadata: `plan_path`, `gaps_path`, `requirements`, `review_iteration`, `updated_at` |
-| `{base}.PLANNER.mail` | User-facing only: requirements for plan creation (written by `autocode plan`) |
+| `{base}.PLANNER.mail` | User-facing only: requirements for plan creation (written by `claude-code-manager plan`) |
 
 ## Installation
 
@@ -84,43 +84,43 @@ Creates `~/.claude-auto-code/`, copies Claude Code commands to `~/.claude/comman
 ### 3. Install the CLI
 
 ```bash
-make install # symlinks bin/autocode to ~/.local/bin/autocode
+make install # symlinks bin/claude-code-manager to ~/.local/bin/claude-code-manager
 ```
 
 Ensure `~/.local/bin` is on `$PATH`.
 
 ## Running the Workflow
 
-### Using the `autocode` CLI (recommended)
+### Using the `claude-code-manager` CLI (recommended)
 
 ```bash
 cd /path/to/your/repo
 
 # Optionally set a specific requirement
-autocode plan "Add user authentication with OAuth"
+claude-code-manager plan "Add user authentication with OAuth"
 
 # Start the workflow — runs until JANITOR completes and pushes
-autocode run
+claude-code-manager run
 
 # Check progress at any time
-autocode status
+claude-code-manager status
 
 # Resume after a failure
-autocode retry
+claude-code-manager retry
 
 # Abort the workflow
-autocode stop
+claude-code-manager stop
 ```
 
-`autocode run` polls all four role scripts every 30 seconds (configurable via `AUTOCODE_INTERVAL`). It exits automatically once JANITOR finishes and clears state.
+`claude-code-manager run` polls all four role scripts every 30 seconds (configurable via `AUTOCODE_INTERVAL`). It exits automatically once JANITOR finishes and clears state.
 
 ### Retry after failure
 
-If a role's tmux session dies or the workflow gets stuck, `autocode retry` reads the current state and metadata, kills any stale sessions, rolls the state back one step, and restarts the workflow loop:
+If a role's tmux session dies or the workflow gets stuck, `claude-code-manager retry` reads the current state and metadata, kills any stale sessions, rolls the state back one step, and restarts the workflow loop:
 
 ```bash
-autocode retry          # resume and run loop
-autocode retry --once   # resume and run a single tick
+claude-code-manager retry          # resume and run loop
+claude-code-manager retry --once   # resume and run a single tick
 ```
 
 ### Using cron (advanced)
@@ -157,7 +157,7 @@ make test
 Runs three test suites:
 - **test_state_meta.sh** — unit tests for state/metadata read/write/clear functions
 - **test_role_guards.sh** — verifies each role script only runs for its designated states
-- **test_retry.sh** — end-to-end tests for `autocode retry` state rollback and resumption
+- **test_retry.sh** — end-to-end tests for `claude-code-manager retry` state rollback and resumption
 
 ## Dependencies
 
@@ -191,11 +191,11 @@ AUTOCODE_CMD_GIT=git
 
 Resolution order (highest priority first):
 
-1. Environment variable (e.g., `AUTOCODE_CMD_PLANNER=claude-opus autocode run`)
+1. Environment variable (e.g., `AUTOCODE_CMD_PLANNER=claude-opus claude-code-manager run`)
 2. `~/.claude-auto-code/config`
 3. Built-in default (`claude` for Claude roles, `git` for JANITOR push)
 
-Run `autocode status` to see which commands are currently active for each role.
+Run `claude-code-manager status` to see which commands are currently active for each role.
 
 ## Script Library
 

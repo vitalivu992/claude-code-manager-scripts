@@ -4,7 +4,7 @@ SHELL         := /bin/bash
 INSTALL_DIR          ?= $(HOME)/.local/bin
 COMMANDS_DIR         ?= $(HOME)/.claude/commands
 DATADIR              ?= $(HOME)/.claude-auto-code
-BIN           := $(CURDIR)/bin/autocode
+BIN           := $(CURDIR)/bin/claude-code-manager
 
 GREEN  := \033[0;32m
 RED    := \033[0;31m
@@ -25,12 +25,12 @@ help: ## Show this help message
 	@printf "\n$(BOLD)QUICKSTART$(RESET)\n"
 	@printf "  make check        # verify all dependencies\n"
 	@printf "  make configure    # set up data directory and config\n"
-	@printf "  make install      # add autocode to PATH and copy commands to ~/.claude/commands/\n"
+	@printf "  make install      # add claude-code-manager to PATH and copy commands to ~/.claude/commands/\n"
 	@printf "\n$(BOLD)THEN, FROM ANY REPO$(RESET)\n"
-	@printf "  autocode plan \"Add feature X\"   # set requirements\n"
-	@printf "  autocode run                     # start the workflow\n"
-	@printf "  autocode status                  # check progress\n"
-	@printf "  autocode stop                    # abort\n"
+	@printf "  claude-code-manager plan \"Add feature X\"   # set requirements\n"
+	@printf "  claude-code-manager run                     # start the workflow\n"
+	@printf "  claude-code-manager status                  # check progress\n"
+	@printf "  claude-code-manager stop                    # abort\n"
 
 check: ## Check all required and optional dependencies
 	@printf "$(BOLD)Required dependencies$(RESET)\n"
@@ -54,12 +54,12 @@ configure: ## Create data directory and default config file
 	@mkdir -p "$(DATADIR)"
 	@printf "  $(OK) Created $(DATADIR)\n"
 	@if [ ! -f "$(DATADIR)/config" ]; then \
-		printf '# autocode per-role command configuration\n# Set the CLI command to use for each role.\n# Environment variables take precedence over this file.\n\nAUTOCODE_CMD_PLANNER=claude\nAUTOCODE_CMD_EXECUTOR=claude\nAUTOCODE_CMD_REVIEWER=claude\nAUTOCODE_CMD_JANITOR=claude\nAUTOCODE_CMD_GIT=git\n' > "$(DATADIR)/config"; \
+		printf '# claude-code-manager per-role command configuration\n# Set the CLI command to use for each role.\n# Environment variables take precedence over this file.\n\nAUTOCODE_CMD_PLANNER=claude\nAUTOCODE_CMD_EXECUTOR=claude\nAUTOCODE_CMD_REVIEWER=claude\nAUTOCODE_CMD_JANITOR=claude\nAUTOCODE_CMD_GIT=git\n' > "$(DATADIR)/config"; \
 		printf "  $(OK) Created $(DATADIR)/config\n"; \
 	else \
 		printf "  $(YELLOW)~$(RESET) $(DATADIR)/config already exists, skipping\n"; \
 	fi
-	@printf "\n$(GREEN)Done!$(RESET) Run 'make install' then 'autocode help' to get started.\n"
+	@printf "\n$(GREEN)Done!$(RESET) Run 'make install' then 'claude-code-manager help' to get started.\n"
 
 test: ## Run all tests
 	@printf "$(BOLD)Running tests...$(RESET)\n"
@@ -68,10 +68,10 @@ test: ## Run all tests
 	@bash tests/test_retry.sh
 	@printf "\n$(GREEN)All test suites passed.$(RESET)\n"
 
-install: ## Symlink bin/autocode into ~/.local/bin and copy commands to ~/.claude/commands/
+install: ## Symlink bin/claude-code-manager into ~/.local/bin and copy commands to ~/.claude/commands/
 	@mkdir -p "$(INSTALL_DIR)"
-	@ln -sf "$(BIN)" "$(INSTALL_DIR)/autocode"
-	@printf "  $(OK) Symlinked $(BIN) -> $(INSTALL_DIR)/autocode\n"
+	@ln -sf "$(BIN)" "$(INSTALL_DIR)/claude-code-manager"
+	@printf "  $(OK) Symlinked $(BIN) -> $(INSTALL_DIR)/claude-code-manager\n"
 	@mkdir -p "$(COMMANDS_DIR)"
 	@cp -u commands/*.md "$(COMMANDS_DIR)/"
 	@printf "  $(OK) Copied commands to $(COMMANDS_DIR)\n"

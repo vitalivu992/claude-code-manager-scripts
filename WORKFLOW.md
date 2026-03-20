@@ -34,7 +34,7 @@ All state lives under `~/.claude-auto-code/`, keyed by a base name derived from 
 | `executor:done` | REVIEWER | Starts review session |
 | `reviewer:active` | REVIEWER | Polls for approval or gaps |
 | `reviewer:approved` | JANITOR | Starts commit session |
-| `reviewer:gaps` | EXECUTOR | Starts gap-fix iteration |
+| `reviewer:gaps` | EXECUTOR | Starts gap-fix iteration (max 3; stops workflow if exceeded) |
 | `janitor:commit` | JANITOR | Polls for commit completion, then pushes (if `AUTOCODE_GIT_PUSH=true`) |
 | `janitor:push` | JANITOR | Polls for push completion, then cleans up (skipped when `AUTOCODE_GIT_PUSH=false`) |
 
@@ -109,13 +109,15 @@ All state lives under `~/.claude-auto-code/`, keyed by a base name derived from 
 **State is `reviewer:gaps` → fix gaps**
 
 - Reads `plan_path` and `gaps_path` from metadata, increments `review_iteration`.
-- Creates the EXECUTOR session, launches `$AUTOCODE_CMD_EXECUTOR`.
-- Sends:
+- If `review_iteration` would exceed 3: prints a warning, clears all state and metadata, kills all role sessions, and exits. The workflow stops and the user must intervene manually.
+- Otherwise creates the EXECUTOR session, launches `$AUTOCODE_CMD_EXECUTOR`.
+- Sends (note priority ordering — gaps plan is PRIMARY):
   ```
-  /ralph-loop:ralph-loop "review the code changes, existing source code, documents and
-  the plan <plan_path> and the gaps documented and plan in <gaps_path>, review if the gaps
-  are valid or not, then fix the necessary gaps, make sure all requirements are fulfilled,
-  all tests pass then output READY_FOR_REVIEW" --completion-promise "READY_FOR_REVIEW"
+  /ralph-loop:ralph-loop "Fix implementation gaps. PRIMARY plan to implement: <gaps_path>
+  (this is the revised plan — it supersedes the original). Background context — original
+  plan: <plan_path>. Review the code changes against the gaps plan, validate which gaps are
+  legitimate, then fix them. Make sure all requirements are fulfilled, all tests pass then
+  output READY_FOR_REVIEW" --completion-promise "READY_FOR_REVIEW"
   ```
 - Writes state `executor:active`.
 

@@ -53,16 +53,35 @@ if [ -z "$plan_file_path" ]; then
     exit 1
 fi
 
+# Early check for max iterations (before creating any session)
+if [ "$current_state" = "reviewer:gaps" ]; then
+    gaps_path=$(read_meta "gaps_path")
+    review_iteration=$(read_meta "review_iteration")
+    review_iteration=$((${review_iteration:-0} + 1))
+    if [ "$review_iteration" -gt 3 ]; then
+        echo "⚠️ Max review iterations (3) reached. Stopping workflow for manual review."
+        echo "   Original plan: $plan_file_path"
+        echo "   Latest gaps plan: $gaps_path"
+        clear_state
+        clear_meta
+        for role in "PLANNER" "EXECUTOR" "REVIEWER" "JANITOR"; do
+            role_session="${base_name}-${role}"
+            if tmux has-session -t "$role_session" 2>/dev/null; then
+                tmux kill-session -t "$role_session"
+                echo "🛑 Killed session: $role_session"
+            fi
+        done
+        exit 0
+    fi
+fi
+
 create_session "EXECUTOR"
 send_command "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR"
 sleep 10
 
 if [ "$current_state" = "reviewer:gaps" ]; then
-    gaps_path=$(read_meta "gaps_path")
-    review_iteration=$(read_meta "review_iteration")
-    review_iteration=$((${review_iteration:-0} + 1))
     write_meta "review_iteration" "$review_iteration"
-    send_command "EXECUTOR" "/ralph-loop:ralph-loop \"review the code changes, existing source code, documents and the plan $plan_file_path and the gaps documented and plan in $gaps_path, review if the gaps are valid or not, then fix the necessary gaps, make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""
+    send_command "EXECUTOR" "/ralph-loop:ralph-loop \"Fix implementation gaps. PRIMARY plan to implement: $gaps_path (this is the revised plan — it supersedes the original). Background context — original plan: $plan_file_path. Review the code changes against the gaps plan, validate which gaps are legitimate, then fix them. Make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""
 else
     write_meta "review_iteration" "0"
     send_command "EXECUTOR" "/ralph-loop:ralph-loop \"review existing source code, documents and execute the plan $plan_file_path, make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""

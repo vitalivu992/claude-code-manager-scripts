@@ -95,6 +95,28 @@ for state in "" "planner:active" "planner:done" "executor:active" "executor:done
     assert_exit_code "0" "$?" "rejects '${state:-empty}'"
 done
 
+describe "EXECUTOR max iteration guard"
+
+it "EXECUTOR exits when review_iteration would exceed 3"
+write_state "reviewer:gaps" "$TEST_REPO"
+write_meta "plan_path" "~/.claude/plans/plan.md" "$TEST_REPO"
+write_meta "gaps_path" "~/.claude/plans/gaps.md" "$TEST_REPO"
+write_meta "review_iteration" "3" "$TEST_REPO"
+output=$("$REPO_DIR/scripts/cc-executor-session.sh" 2>&1 || true)
+echo "$output" | grep -q "Max review iterations"
+assert_exit_code "0" "$?" "exits at iteration 4 (review_iteration=3 → 4)"
+result_state=$(read_state "$TEST_REPO")
+assert_eq "" "$result_state" "state cleared after max iterations"
+
+it "EXECUTOR proceeds at review_iteration 3 (last allowed)"
+write_state "reviewer:gaps" "$TEST_REPO"
+write_meta "plan_path" "~/.claude/plans/plan.md" "$TEST_REPO"
+write_meta "gaps_path" "~/.claude/plans/gaps.md" "$TEST_REPO"
+write_meta "review_iteration" "2" "$TEST_REPO"
+output=$("$REPO_DIR/scripts/cc-executor-session.sh" 2>&1 || true)
+echo "$output" | grep -qv "Max review iterations"
+assert_exit_code "0" "$?" "proceeds at iteration 3 (review_iteration=2 → 3)"
+
 clear_state "$TEST_REPO"
 teardown_test_env
 print_summary

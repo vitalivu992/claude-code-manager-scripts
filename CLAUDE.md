@@ -128,10 +128,10 @@ claude-code-manager retry --once   # resume and run a single tick
 Add entries to crontab (`crontab -e`):
 
 ```cron
-*/5 * * * * cd /path/to/your/repo && /path/to/autocode-scripts/scripts/cc-planner-session.sh
-*/5 * * * * cd /path/to/your/repo && /path/to/autocode-scripts/scripts/cc-executor-session.sh
-*/5 * * * * cd /path/to/your/repo && /path/to/autocode-scripts/scripts/cc-reviewer-session.sh
-*/5 * * * * cd /path/to/your/repo && /path/to/autocode-scripts/scripts/cc-janitor-session.sh
+*/5 * * * * cd /path/to/your/repo && /path/to/claude-code-manager-scripts/scripts/cc-planner-session.sh
+*/5 * * * * cd /path/to/your/repo && /path/to/claude-code-manager-scripts/scripts/cc-executor-session.sh
+*/5 * * * * cd /path/to/your/repo && /path/to/claude-code-manager-scripts/scripts/cc-reviewer-session.sh
+*/5 * * * * cd /path/to/your/repo && /path/to/claude-code-manager-scripts/scripts/cc-janitor-session.sh
 ```
 
 With the shared flock, only one role script executes per cron cycle. Each script exits immediately if it's not their turn (based on state).

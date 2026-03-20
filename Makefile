@@ -17,7 +17,7 @@ MISS   := $(RED)✘$(RESET)
 .PHONY: help check configure install test
 
 help: ## Show this help message
-	@printf "$(BOLD)autocode-scripts$(RESET) — multi-agent AI coding workflow\n\n"
+	@printf "$(BOLD)claude-code-manager-scripts$(RESET) — multi-agent AI coding workflow\n\n"
 	@printf "$(BOLD)USAGE$(RESET)\n"
 	@printf "  make <target>\n\n"
 	@printf "$(BOLD)TARGETS$(RESET)\n"
@@ -50,7 +50,7 @@ check: ## Check all required and optional dependencies
 	_check git "git" "apt install git"
 
 configure: ## Create data directory and default config file
-	@printf "$(BOLD)Configuring autocode-scripts...$(RESET)\n"
+	@printf "$(BOLD)Configuring claude-code-manager-scripts...$(RESET)\n"
 	@mkdir -p "$(DATADIR)"
 	@printf "  $(OK) Created $(DATADIR)\n"
 	@if [ ! -f "$(DATADIR)/config" ]; then \

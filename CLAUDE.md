@@ -11,10 +11,10 @@ This repository implements a **multi-agent AI coding workflow** that orchestrate
 The workflow consists of four roles coordinated through a central state file in `~/.claude-auto-code/`:
 
 ```
-┌─────────────┐  planner:done  ┌─────────────┐  executor:done  ┌─────────────┐
-│   PLANNER   │ ─────────────> │   EXECUTOR   │ ─────────────> │   REVIEWER   │
+┌─────────────┐  planner:done  ┌──────────────┐  executor:done ┌─────────────┐
+│   PLANNER   │ ─────────────> │   EXECUTOR   │ ─────────────> │   REVIEWER  │
 │             │                │              │ <───────────── │             │
-└─────────────┘                └──────────────┘  reviewer:gaps  └─────────────┘
+└─────────────┘                └──────────────┘  reviewer:gaps └─────────────┘
                                                                       │
                                 ┌─────────────┐                       │
                                 │   JANITOR   │ <─────────────────────┘
@@ -25,7 +25,7 @@ The workflow consists of four roles coordinated through a central state file in 
 1. **PLANNER** (`scripts/cc-planner-session.sh`): Creates an implementation plan. Extracts plan file path when idle and transitions state to `planner:done`.
 2. **EXECUTOR** (`scripts/cc-executor-session.sh`): Implements the plan using `/ralph-loop:ralph-loop`. Transitions to `executor:done` when `READY_FOR_REVIEW` is detected. Handles gap-fix iterations from REVIEWER.
 3. **REVIEWER** (`scripts/cc-reviewer-session.sh`): Reviews implementation for gaps using `/reviewer-review-impl-gaps`. Transitions to `reviewer:approved` or `reviewer:gaps`.
-4. **JANITOR** (`scripts/cc-janitor-session.sh`): Runs `$AUTOCODE_CMD_JANITOR` for commits, `$AUTOCODE_CMD_GIT push`, cleans up all state, and terminates all workflow sessions.
+4. **JANITOR** (`scripts/cc-janitor-session.sh`): Runs `$AUTOCODE_CMD_JANITOR` for commits, optionally runs `$AUTOCODE_CMD_GIT push` (controlled by `AUTOCODE_GIT_PUSH`), cleans up all state, and terminates all workflow sessions.
 
 ### State Machine
 
@@ -41,8 +41,8 @@ All roles share a single state file (`${base}.state`) that drives the workflow:
 | `reviewer:active` | REVIEWER | Polling for review outcome |
 | `reviewer:approved` | JANITOR | Start commit + push |
 | `reviewer:gaps` | EXECUTOR | Start gap-fix iteration |
-| `janitor:commit` | JANITOR | Polling for commit completion |
-| `janitor:push` | JANITOR | Polling for push completion |
+| `janitor:commit` | JANITOR | Polling for commit completion; pushes if `AUTOCODE_GIT_PUSH=true` |
+| `janitor:push` | JANITOR | Polling for push completion (skipped when `AUTOCODE_GIT_PUSH=false`) |
 
 ### Concurrency: Directory-Based Mutex
 
@@ -96,8 +96,14 @@ Ensure `~/.local/bin` is on `$PATH`.
 ```bash
 cd /path/to/your/repo
 
+# Copy workflow commands into the repo (first time per repo)
+claude-code-manager init
+
 # Optionally set a specific requirement
 claude-code-manager plan "Add user authentication with OAuth"
+
+# Or skip the PLANNER entirely using an existing plan file
+claude-code-manager set-plan /path/to/my-plan.md
 
 # Start the workflow — runs until JANITOR completes and pushes
 claude-code-manager run
@@ -128,7 +134,7 @@ claude-code-manager retry --once   # resume and run a single tick
 Add an entry to crontab (`crontab -e`):
 
 ```cron
-*/5 * * * * cd /path/to/your/repo && claude-code-manager run --once
+0 * * * * cd /path/to/your/repo && claude-code-manager run --once
 ```
 
 `--once` runs a single tick per cron invocation; the `.lockdir` mutex ensures only one execution runs at a time even if cron fires while a previous tick is still in progress.
@@ -148,13 +154,16 @@ List sessions: `tmux ls`
 ## Testing
 
 ```bash
+# Run all test suites
 make test
+
+# Run individual test suites
+bash tests/test_state_meta.sh   # state/metadata unit tests
+bash tests/test_role_guards.sh  # role state transition guards
+bash tests/test_retry.sh        # retry state rollback and resumption
 ```
 
-Runs three test suites:
-- **test_state_meta.sh** — unit tests for state/metadata read/write/clear functions
-- **test_role_guards.sh** — verifies each role script only runs for its designated states
-- **test_retry.sh** — end-to-end tests for `claude-code-manager retry` state rollback and resumption
+All tests use a temporary `TESTTMP` directory and do not touch the real `~/.claude-auto-code/`.
 
 ## Dependencies
 
@@ -162,6 +171,16 @@ Runs three test suites:
 - **realpath** (from `coreutils`): Resolves absolute repo paths for session naming
 - **claude**: Claude Code CLI (used within sessions for `/ralph-loop`, `/planner-*`, `/reviewer-*`)
 - **git**: Version control (configurable via `AUTOCODE_CMD_GIT`)
+
+## Development Workflow
+
+When modifying this repository:
+
+1. Run `make check` to verify dependencies
+2. Run `make test` after changes to ensure all tests pass
+3. Run `make install` to update the symlink in `~/.local/bin/`
+4. Role scripts are self-contained state machines — each checks the current state and exits if not their turn
+5. The lock directory (`.lockdir`) prevents concurrent execution; stale locks are auto-cleaned if PID is dead
 
 ## Role Documentation
 
@@ -180,13 +199,24 @@ AUTOCODE_CMD_EXECUTOR=claude
 AUTOCODE_CMD_REVIEWER=claude
 AUTOCODE_CMD_JANITOR=claude
 AUTOCODE_CMD_GIT=git
+AUTOCODE_GIT_PUSH=true
 ```
 
 Resolution order (highest priority first):
 
 1. Environment variable (e.g., `AUTOCODE_CMD_PLANNER=claude-opus claude-code-manager run`)
 2. `~/.claude-auto-code/config`
-3. Built-in default (`claude` for Claude roles, `git` for JANITOR push)
+3. Built-in default (`claude` for Claude roles, `git` for JANITOR push, `true` for `AUTOCODE_GIT_PUSH`)
+
+Set `AUTOCODE_GIT_PUSH=false` to skip the `git push` step after committing — useful when you want to review changes before pushing or use a CI pipeline instead.
+
+### Polling Interval
+
+Control how often `claude-code-manager run` polls role scripts:
+
+```bash
+AUTOCODE_INTERVAL=60 claude-code-manager run   # poll every 60 seconds (default: 30)
+```
 
 Run `claude-code-manager status` to see which commands are currently active for each role.
 

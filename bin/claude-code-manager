@@ -18,10 +18,10 @@ _yellow() { printf '\033[0;33m%s\033[0m\n' "$*"; }
 _bold()   { printf '\033[1m%s\033[0m\n' "$*"; }
 
 cmd_help() {
-    _bold "autocode — multi-agent AI coding workflow"
+    _bold "claude-code-manager — multi-agent AI coding workflow"
     echo ""
     echo "USAGE"
-    echo "  autocode <command> [args]"
+    echo "  claude-code-manager <command> [args]"
     echo ""
     echo "COMMANDS"
     printf "  %-30s %s\n" 'plan "<requirement>"' 'Set requirements for the PLANNER (creates mail file)'
@@ -33,12 +33,12 @@ cmd_help() {
     echo ""
     echo "QUICKSTART"
     echo "  cd /path/to/your/repo"
-    echo "  autocode plan \"Add user authentication with OAuth\""
-    echo "  autocode run"
+    echo "  claude-code-manager plan \"Add user authentication with OAuth\""
+    echo "  claude-code-manager run"
     echo ""
     echo "RETRY (resume after failure)"
-    echo "  autocode retry              # resume from current state and run loop"
-    echo "  autocode retry --once       # resume and run a single tick"
+    echo "  claude-code-manager retry              # resume from current state and run loop"
+    echo "  claude-code-manager retry --once       # resume and run a single tick"
     echo ""
     echo "OPTIONS"
     printf "  %-30s %s\n" 'AUTOCODE_INTERVAL=<seconds>' "Polling interval for 'run' (default: $AUTOCODE_INTERVAL)"
@@ -54,6 +54,7 @@ cmd_help() {
     echo "  make install          # create symlink in ~/.local/bin"
     echo "  make check            # verify all dependencies"
     echo "  make configure        # set up required directories and commands"
+
 }
 
 cmd_plan() {
@@ -64,13 +65,13 @@ cmd_plan() {
 
     if [ -z "$requirement" ]; then
         _red "Error: requirement text is required"
-        echo "Usage: autocode plan \"<requirement text>\""
+        echo "Usage: claude-code-manager plan \"<requirement text>\""
         exit 1
     fi
 
     echo "$requirement" > "$mail_file"
     _green "Requirement written to $mail_file"
-    echo "Run 'autocode run' to start the workflow."
+        echo "Run 'claude-code-manager run' to start the workflow."
 }
 
 _is_workflow_done() {
@@ -111,7 +112,7 @@ cmd_run() {
     if ! $once; then
         if [ -z "$current_state" ] && [ ! -f "$planner_mail" ]; then
             _yellow "No requirement set. The PLANNER will auto-select a feature."
-            echo "Tip: run 'autocode plan \"<requirement>\"' first to set a specific goal."
+            echo "Tip: run 'claude-code-manager plan \"<requirement>\"' first to set a specific goal."
         fi
         echo "Starting workflow loop (interval: ${AUTOCODE_INTERVAL}s). Press Ctrl+C to stop."
         echo ""
@@ -148,8 +149,8 @@ cmd_retry() {
     current_state=$(read_state)
 
     if [ -z "$current_state" ]; then
-        _red "No workflow state found. Nothing to retry."
-        _yellow "Use 'autocode plan' and 'autocode run' to start a new workflow."
+    _red "No workflow state found. Nothing to retry."
+    _yellow "Use 'claude-code-manager plan' and 'claude-code-manager run' to start a new workflow."
         exit 1
     fi
 

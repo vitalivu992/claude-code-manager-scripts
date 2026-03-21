@@ -49,6 +49,9 @@ if [ "$current_state" = "janitor:commit" ] || [ "$current_state" = "janitor:push
             echo "⏭️  git push disabled (AUTOCODE_GIT_PUSH!=true), skipping push"
             clear_state
             clear_meta
+            for role in "PLANNER" "EXECUTOR" "REVIEWER" "JANITOR"; do
+                rm -f "$datadir/${base_name}.${role}.log" "$datadir/${base_name}.${role}.log.prev"
+            done
             rm -rf "$datadir/${base_name}.lockdir"
             echo "🧹 Terminating all workflow sessions..."
             for role in "PLANNER" "EXECUTOR" "REVIEWER" "JANITOR"; do
@@ -76,6 +79,9 @@ if [ "$current_state" = "janitor:commit" ] || [ "$current_state" = "janitor:push
         echo "🎉 git push done, cleaning up"
         clear_state
         clear_meta
+        for role in "PLANNER" "EXECUTOR" "REVIEWER" "JANITOR"; do
+            rm -f "$datadir/${base_name}.${role}.log" "$datadir/${base_name}.${role}.log.prev"
+        done
         rm -rf "$datadir/${base_name}.lockdir"
         echo "🧹 Terminating all workflow sessions..."
         for role in "PLANNER" "EXECUTOR" "REVIEWER" "JANITOR"; do

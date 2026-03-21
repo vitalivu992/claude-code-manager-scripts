@@ -38,7 +38,7 @@ if [ "$current_state" = "reviewer:active" ]; then
     output=$(capture_last_lines "REVIEWER" 50)
     echo "$output"|sed 's/^/>>> /'
 
-    if echo "$output" | grep -qE '^\s*REVIEWER_APPROVED\s*$'; then
+    if echo "$output" | sed 's/●/ /' |grep -qE '^\s*REVIEWER_APPROVED\s*$'; then
         echo "📬 REVIEWER_APPROVED detected"
         write_state "reviewer:approved"
         write_meta "updated_at" "$(date -Iseconds)"

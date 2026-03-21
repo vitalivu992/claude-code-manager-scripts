@@ -175,7 +175,7 @@ send_command() {
 # ----------------------------------------------------------------------------
 capture_last_lines() {
     local role="$1"                     # PLANNER / EXECUTOR / REVIEWER / JANITOR
-    local length="${2:-30}"
+    local length="${2:-50}"
     local repo_path="${3:-$(pwd)}"
     local base=$(get_base_name "$repo_path")
     local session="${base}-${role}"
@@ -194,30 +194,47 @@ capture_last_lines() {
     echo "$output"
 }
 
-# Returns 0 if the session pane output has not changed between two captures
+# Returns 0 if the session pane output has not changed since the previous tick
 # (i.e. the process is idle/stopped), 1 if it is still producing output.
+# Compares current capture against ~/.claude-auto-code/{base}.{role}.log.prev
+# written on the prior tick; no blocking sleep required.
 is_session_idle() {
     local role="$1"
     local repo_path="${2:-$(pwd)}"
     local base=$(get_base_name "$repo_path")
     local session="${base}-${role}"
+    local datadir="$HOME/.claude-auto-code"
+    local log_file="$datadir/${base}.${role}.log"
+    local prev_file="$datadir/${base}.${role}.log.prev"
 
     if ! tmux has-session -t "$session" 2>/dev/null; then
         return 0
     fi
 
-    local snap1 snap2
-    snap1=$(capture_last_lines "$role" 30)
-    sleep 5
-    snap2=$(capture_last_lines "$role" 30)
+    # Capture current pane output (50 lines, no decorative header)
+    local current
+    current=$(tmux capture-pane -S -50 -p -t "$session" 2>/dev/null)
 
-    if [ "$snap1" = "$snap2" ]; then
+    # First tick: no baseline yet — create empty prev, save current, return not-idle
+    if [ ! -f "$prev_file" ]; then
+        touch "$prev_file"
+        echo "$current" > "$log_file"
+        mv "$log_file" "$prev_file"
+        return 1
+    fi
+
+    echo "$current" > "$log_file"
+
+    if diff -q "$prev_file" "$log_file" > /dev/null 2>&1; then
+        # Same as last tick: session is idle
+        mv "$log_file" "$prev_file"
         return 0
     else
+        # Different from last tick: session is still running
         echo "💜 Session $session is running"
-        snaplength=$(echo "$snap2" | wc -l)
-        echo "$snap2" | grep -vE '^\s*$' | grep -vE '^\s*─────\s*$' | sed 's/^/>>> /' | tail -n 10
+        grep -vE '^\s*$' "$log_file" | grep -vE '^\s*─────\s*$' | sed 's/^/>>> /' | tail -n 10
         echo ""
+        mv "$log_file" "$prev_file"
         return 1
     fi
 }

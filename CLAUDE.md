@@ -62,6 +62,8 @@ All files reside in `~/.claude-auto-code/`:
 | `{base}.state` | Current workflow state (single value from the state machine) |
 | `{base}.meta` | Key=value metadata: `plan_path`, `gaps_path`, `requirements`, `review_iteration`, `updated_at` |
 | `{base}.PLANNER.mail` | User-facing only: requirements for plan creation (written by `claude-code-manager plan`) |
+| `{base}.{ROLE}.log` | Temporary current-tick pane snapshot; immediately rotated to `.log.prev` |
+| `{base}.{ROLE}.log.prev` | Previous-tick pane snapshot used by `is_session_idle` for change detection; cleaned up by JANITOR |
 
 ## Installation
 
@@ -228,7 +230,7 @@ Run `claude-code-manager status` to see which commands are currently active for 
 - `create_session ROLE [path]` - Create a tmux session for a role
 - `send_command ROLE "cmd" [path]` - Send command to a role's session
 - `capture_last_lines ROLE [length] [path]` - Capture and print last N lines
-- `is_session_idle ROLE [path]` - Check if session is idle (no output change in 5 seconds)
+- `is_session_idle ROLE [path]` - Check if session is idle by comparing current pane output (50 lines) against the previous tick's snapshot (`~/.claude-auto-code/{base}.{ROLE}.log.prev`); no blocking sleep
 - `interrupt_current_command ROLE [path]` - Send Ctrl+C to interrupt running command
 - `load_config` - Load `~/.claude-auto-code/config` and set per-role command variables
 - `read_state [path]` / `write_state STATE [path]` / `clear_state [path]` - Workflow state management

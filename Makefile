@@ -64,6 +64,7 @@ test: ## Run all tests
 	@bash tests/test_state_meta.sh
 	@bash tests/test_role_guards.sh
 	@bash tests/test_retry.sh
+	@bash tests/test_idle_detection.sh
 	@printf "\n$(GREEN)All test suites passed.$(RESET)\n"
 
 install: ## Symlink bin/claude-code-manager into ~/.local/bin and copy commands to ~/.claude/commands/

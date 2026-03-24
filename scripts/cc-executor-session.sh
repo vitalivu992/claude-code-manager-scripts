@@ -41,6 +41,7 @@ if [ "$current_state" = "executor:active" ]; then
         echo "📬 READY_FOR_REVIEW detected"
         write_state "executor:done"
         write_meta "updated_at" "$(date -Iseconds)"
+        rm -f "$(pwd)/.claude/ralph-loop.local.md"
         send_command "EXECUTOR" "/exit"
         tmux kill-session -t "$session_name" 2>/dev/null
     fi

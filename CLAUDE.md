@@ -60,7 +60,7 @@ All files reside in `~/.claude-auto-code/`:
 |--------------|---------|
 | `{base}.lockdir/pid` | Directory-based mutex for all roles (prevents concurrent execution); holds PID of the active role |
 | `{base}.state` | Current workflow state (single value from the state machine) |
-| `{base}.meta` | Key=value metadata: `plan_path`, `gaps_path`, `requirements`, `review_iteration`, `updated_at` |
+| `{base}.meta` | Key=value metadata: `plan_path`, `gaps_path`, `requirements`, `review_iteration`, `executor_idle_count`, `executor_restart_count`, `updated_at` |
 | `{base}.PLANNER.mail` | User-facing only: requirements for plan creation (written by `claude-code-manager plan`) |
 | `{base}.{ROLE}.log` | Temporary current-tick pane snapshot; immediately rotated to `.log.prev` |
 | `{base}.{ROLE}.log.prev` | Previous-tick pane snapshot used by `is_session_idle` for change detection; cleaned up by JANITOR |
@@ -202,6 +202,8 @@ AUTOCODE_CMD_REVIEWER=claude
 AUTOCODE_CMD_JANITOR=claude
 AUTOCODE_CMD_GIT=git
 AUTOCODE_GIT_PUSH=true
+AUTOCODE_EXECUTOR_IDLE_THRESHOLD=2
+AUTOCODE_EXECUTOR_MAX_RESTARTS=3
 ```
 
 Resolution order (highest priority first):

@@ -90,9 +90,10 @@ All state lives under `~/.claude-auto-code/`, keyed by a base name derived from 
 
 - Verifies the EXECUTOR session exists.
 - Calls `is_session_idle "EXECUTOR"`.
-  - **Still active:** exits.
+  - **Still active:** resets `executor_idle_count` to 0, exits.
   - **Idle:** captures last 50 pane lines.
-    - If `READY_FOR_REVIEW` found: sends `/exit`, kills session, writes state `executor:done`.
+    - If `READY_FOR_REVIEW` found: resets `executor_idle_count` to 0, sends `/exit`, kills session, writes state `executor:done`.
+    - Otherwise: increments `executor_idle_count`. If count is below `AUTOCODE_EXECUTOR_IDLE_THRESHOLD`, exits (waits for next tick). If threshold is reached, increments `executor_restart_count`. If `executor_restart_count` exceeds `AUTOCODE_EXECUTOR_MAX_RESTARTS`, clears all state and metadata, kills all sessions, and stops the workflow. Otherwise kills the session, removes `.log.prev` (so the new session gets a fresh idle baseline), recreates the session with the same ralph-loop command (initial plan or gap-fix depending on context), and stays in `executor:active` state.
 
 **State is `planner:done` → start execution**
 
@@ -126,6 +127,22 @@ All state lives under `~/.claude-auto-code/`, keyed by a base name derived from 
 | Signal | Meaning |
 |--------|---------|
 | `READY_FOR_REVIEW` in pane output | Implementation complete — triggers `executor:done` |
+
+### Idle restart metadata
+
+| Key | Default | Purpose |
+|-----|---------|---------|
+| `executor_idle_count` | 0 | Consecutive idle ticks without `READY_FOR_REVIEW` |
+| `executor_restart_count` | 0 | Number of automatic session restarts in current execution |
+
+Both counters are reset to 0 when a fresh session is created (`planner:done` or `reviewer:gaps`) and are cleared by JANITOR's `clear_meta` on workflow completion.
+
+### Configuration
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `AUTOCODE_EXECUTOR_IDLE_THRESHOLD` | `2` | Consecutive idle ticks before triggering a restart |
+| `AUTOCODE_EXECUTOR_MAX_RESTARTS` | `3` | Maximum auto-restarts before stopping the workflow |
 
 ### Commands used
 

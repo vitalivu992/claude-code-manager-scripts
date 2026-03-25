@@ -30,6 +30,7 @@ if [ "$current_state" = "executor:active" ]; then
     fi
 
     if ! is_session_idle "EXECUTOR"; then
+        write_meta "executor_idle_count" "0"
         echo "⏳ EXECUTOR session is still active, exiting"
         exit 0
     fi
@@ -39,12 +40,61 @@ if [ "$current_state" = "executor:active" ]; then
     echo "$output"
     if echo "$output" | sed 's/●/ /' | grep -qE '^\s*READY_FOR_REVIEW\s*$'; then
         echo "📬 READY_FOR_REVIEW detected"
+        write_meta "executor_idle_count" "0"
         write_state "executor:done"
         write_meta "updated_at" "$(date -Iseconds)"
         rm -f "$(pwd)/.claude/ralph-loop.local.md"
         send_command "EXECUTOR" "/exit"
         tmux kill-session -t "$session_name" 2>/dev/null
+        exit 0
     fi
+
+    # Increment consecutive idle counter
+    idle_count=$(read_meta "executor_idle_count")
+    idle_count=$(( ${idle_count:-0} + 1 ))
+    write_meta "executor_idle_count" "$idle_count"
+
+    if [ "$idle_count" -lt "$AUTOCODE_EXECUTOR_IDLE_THRESHOLD" ]; then
+        echo "Idle tick $idle_count/$AUTOCODE_EXECUTOR_IDLE_THRESHOLD, waiting..."
+        exit 0
+    fi
+
+    # Threshold reached — check restart bound
+    restart_count=$(read_meta "executor_restart_count")
+    restart_count=$(( ${restart_count:-0} + 1 ))
+
+    if [ "$restart_count" -gt "$AUTOCODE_EXECUTOR_MAX_RESTARTS" ]; then
+        echo "Max restarts ($AUTOCODE_EXECUTOR_MAX_RESTARTS) reached. Stopping."
+        clear_state
+        clear_meta
+        for role in PLANNER EXECUTOR REVIEWER JANITOR; do
+            tmux kill-session -t "${base_name}-${role}" 2>/dev/null
+        done
+        exit 0
+    fi
+
+    echo "Consecutive idle threshold reached, restarting (restart $restart_count/$AUTOCODE_EXECUTOR_MAX_RESTARTS)"
+    tmux kill-session -t "$session_name" 2>/dev/null
+    rm -f "$datadir/${base_name}.EXECUTOR.log.prev"
+    rm -f "$(pwd)/.claude/ralph-loop.local.md"
+    write_meta "executor_idle_count" "0"
+    write_meta "executor_restart_count" "$restart_count"
+    write_meta "updated_at" "$(date -Iseconds)"
+
+    plan_file_path=$(read_meta "plan_path")
+    gaps_path=$(read_meta "gaps_path")
+    review_iteration=$(read_meta "review_iteration")
+
+    create_session "EXECUTOR"
+    send_command "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR"
+    sleep 10
+
+    if [ -n "$gaps_path" ] && [ "${review_iteration:-0}" -gt 0 ]; then
+        send_command "EXECUTOR" "/ralph-loop:ralph-loop \"Fix implementation gaps. PRIMARY plan to implement: $gaps_path (this is the revised plan — it supersedes the original). Background context — original plan: $plan_file_path. Review the code changes against the gaps plan, validate which gaps are legitimate, then fix them. Make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""
+    else
+        send_command "EXECUTOR" "/ralph-loop:ralph-loop \"review existing source code, documents and execute the plan $plan_file_path, make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""
+    fi
+    # State stays executor:active — no state change needed
     exit 0
 fi
 
@@ -79,6 +129,8 @@ fi
 create_session "EXECUTOR"
 send_command "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR"
 sleep 10
+write_meta "executor_idle_count" "0"
+write_meta "executor_restart_count" "0"
 
 if [ "$current_state" = "reviewer:gaps" ]; then
     write_meta "review_iteration" "$review_iteration"

@@ -56,16 +56,110 @@ clear_meta() {
 }
 
 load_config() {
-    local config_file="$HOME/.claude-auto-code/config"
-    [ -f "$config_file" ] && source "$config_file"
-    AUTOCODE_CMD_PLANNER="${AUTOCODE_CMD_PLANNER:-claude}"
-    AUTOCODE_CMD_EXECUTOR="${AUTOCODE_CMD_EXECUTOR:-claude}"
-    AUTOCODE_CMD_REVIEWER="${AUTOCODE_CMD_REVIEWER:-claude}"
-    AUTOCODE_CMD_JANITOR="${AUTOCODE_CMD_JANITOR:-claude}"
-    AUTOCODE_CMD_GIT="${AUTOCODE_CMD_GIT:-git}"
-    AUTOCODE_GIT_PUSH="${AUTOCODE_GIT_PUSH:-true}"
-    AUTOCODE_EXECUTOR_IDLE_THRESHOLD="${AUTOCODE_EXECUTOR_IDLE_THRESHOLD:-2}"
-    AUTOCODE_EXECUTOR_MAX_RESTARTS="${AUTOCODE_EXECUTOR_MAX_RESTARTS:-3}"
+    local config_file="$HOME/.claude-code-manager/config.yaml"
+    AUTOCODE_CMD_GIT="git"
+    AUTOCODE_GIT_PUSH="true"
+    AUTOCODE_EXECUTOR_IDLE_THRESHOLD="2"
+    AUTOCODE_EXECUTOR_MAX_RESTARTS="3"
+    AUTOCODE_INTERVAL="${AUTOCODE_INTERVAL:-30}"
+
+    if [ ! -f "$config_file" ]; then
+        return 0
+    fi
+
+    # Read all scalar config values in a single yq invocation (separator: |)
+    # Use null-safe if/else to correctly handle booleans (false) and zeros.
+    # Strip surrounding quotes that Python-based yq adds around the joined string.
+    local raw
+    raw=$(yq '[
+        (.git.command // ""),
+        (if .git.push == null then "" else (.git.push | tostring) end),
+        (if .interval == null then "" else (.interval | tostring) end),
+        (if .roles.executor.idle_threshold == null then "" else (.roles.executor.idle_threshold | tostring) end),
+        (if .roles.executor.max_restarts == null then "" else (.roles.executor.max_restarts | tostring) end)
+    ] | join("|")' "$config_file" 2>/dev/null | tr -d '"') || return 0
+
+    local git_cmd git_push interval idle_threshold max_restarts
+    IFS='|' read -r git_cmd git_push interval idle_threshold max_restarts <<< "$raw"
+
+    [ -n "$git_cmd" ]       && [ "$git_cmd" != "null" ]       && AUTOCODE_CMD_GIT="$git_cmd"
+    [ -n "$git_push" ]      && [ "$git_push" != "null" ]      && AUTOCODE_GIT_PUSH="$git_push"
+    [ -n "$interval" ]      && [ "$interval" != "null" ]      && AUTOCODE_INTERVAL="$interval"
+    [ -n "$idle_threshold" ] && [ "$idle_threshold" != "null" ] && AUTOCODE_EXECUTOR_IDLE_THRESHOLD="$idle_threshold"
+    [ -n "$max_restarts" ]  && [ "$max_restarts" != "null" ]  && AUTOCODE_EXECUTOR_MAX_RESTARTS="$max_restarts"
+}
+
+# Pick a random command from the list configured for a role in config.yaml.
+# Usage: pick_cmd_for_role <role>   (role = planner | executor | reviewer | janitor)
+# Echoes the selected command string. Falls back to "claude" if config/list is missing.
+pick_cmd_for_role() {
+    local role="${1,,}"   # lowercase
+    local config_file="$HOME/.claude-code-manager/config.yaml"
+
+    if [ ! -f "$config_file" ]; then
+        echo "claude"
+        return 0
+    fi
+
+    # Read count and all command entries in a single yq invocation
+    # Output format: "<count>|<cmd0>|<cmd1>|..."
+    # Strip surrounding quotes that Python-based yq adds.
+    local raw
+    raw=$(yq ".roles.${role}.commands | (length | tostring) + \"|\" + join(\"|\")" \
+         "$config_file" 2>/dev/null | tr -d '"') || true
+
+    local count
+    count=$(echo "$raw" | cut -d'|' -f1)
+
+    if [ -z "$count" ] || [ "$count" = "null" ] || [ "$count" -eq 0 ] 2>/dev/null; then
+        echo "claude"
+        return 0
+    fi
+
+    # Pick a random 0-based index and extract the corresponding field (fields are 1-based after count)
+    local idx=$(( RANDOM % count ))
+    local cmd
+    cmd=$(echo "$raw" | cut -d'|' -f$(( idx + 2 )))
+
+    if [ -z "$cmd" ] || [ "$cmd" = "null" ]; then
+        echo "claude"
+        return 0
+    fi
+    echo "$cmd"
+}
+
+# Wait until the claude interactive prompt is visible in a role's pane.
+# Polls every 2 seconds up to max_wait seconds (default 120).
+# The prompt is identified by the ">" character that claude renders at the
+# start of an input line, or by the box-drawing character "╭" that appears
+# in claude's idle UI.  Either is sufficient to confirm readiness.
+#
+# Usage: wait_for_claude_prompt ROLE [max_wait] [repo_path]
+wait_for_claude_prompt() {
+    local role="$1"
+    local max_wait="${2:-${AUTOCODE_CLAUDE_PROMPT_TIMEOUT:-120}}"
+    local repo_path="${3:-$(pwd)}"
+    local base
+    base=$(get_base_name "$repo_path")
+    local session="${base}-${role}"
+    local elapsed=0
+    local poll_interval=2
+
+    echo "⏳ Waiting for $role prompt (up to ${max_wait}s)..."
+    while [ "$elapsed" -lt "$max_wait" ]; do
+        local pane
+        pane=$(tmux capture-pane -S -10 -p -t "$session" 2>/dev/null)
+        # Claude's idle prompt contains a ">" at the start of the input line,
+        # or the box-drawing top-left corner "╭" of its UI frame.
+        if echo "$pane" | grep -qE '(^|\s)>\s*$|╭'; then
+            echo "✅ $role prompt detected (${elapsed}s)"
+            return 0
+        fi
+        sleep "$poll_interval"
+        elapsed=$(( elapsed + poll_interval ))
+    done
+    echo "⚠️  $role prompt not detected after ${max_wait}s, sending command anyway"
+    return 0
 }
 
 acquire_role_lock() {

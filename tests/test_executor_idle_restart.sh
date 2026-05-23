@@ -52,7 +52,19 @@ SLEEP_EOF
 chmod +x "$MOCK_BIN/sleep"
 
 export PATH="$MOCK_BIN:$PATH"
-export AUTOCODE_CMD_EXECUTOR="echo"
+export AUTOCODE_CLAUDE_PROMPT_TIMEOUT=4   # 2 poll cycles with no-op sleep in tests
+
+# Provide a config.yaml so pick_cmd_for_role resolves the executor command
+# Use "echo" as the command so no real claude is invoked
+mkdir -p "$TEST_HOME/.claude-code-manager"
+cat > "$TEST_HOME/.claude-code-manager/config.yaml" << 'CONFIG_EOF'
+roles:
+  executor:
+    commands:
+      - echo
+    idle_threshold: 2
+    max_restarts: 3
+CONFIG_EOF
 
 # Helpers
 set_session_exists()  { echo 0 > "$MOCK_BIN/.tmux-has-exit"; }

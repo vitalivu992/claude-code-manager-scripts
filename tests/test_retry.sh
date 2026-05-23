@@ -7,6 +7,58 @@ source "$REPO_DIR/scripts/tmux-session.sh"
 setup_test_env
 cd "$TEST_REPO"
 
+# Provide a minimal config.yaml so load_config / pick_cmd_for_role work in subprocesses
+mkdir -p "$TEST_HOME/.claude-code-manager"
+cat > "$TEST_HOME/.claude-code-manager/config.yaml" << 'CONFIG_EOF'
+roles:
+  planner:
+    commands:
+      - echo
+  executor:
+    commands:
+      - echo
+    idle_threshold: 2
+    max_restarts: 3
+  reviewer:
+    commands:
+      - echo
+  janitor:
+    commands:
+      - echo
+git:
+  command: git
+  push: false
+interval: 30
+CONFIG_EOF
+
+# Mock bin: no-op sleep and tmux so role scripts don't hang during retry's _tick
+MOCK_BIN="$TEST_HOME/mock-bin"
+mkdir -p "$MOCK_BIN"
+
+cat > "$MOCK_BIN/tmux" << 'TMUX_EOF'
+#!/bin/bash
+case "$1" in
+    has-session) exit 1 ;;
+    new-session)
+        echo 0 > "$(dirname "$0")/.tmux-has-exit"
+        exit 0 ;;
+    send-keys)   exit 0 ;;
+    kill-session) exit 0 ;;
+    capture-pane) printf "" ;;
+    *) exit 0 ;;
+esac
+TMUX_EOF
+chmod +x "$MOCK_BIN/tmux"
+
+cat > "$MOCK_BIN/sleep" << 'SLEEP_EOF'
+#!/bin/bash
+true
+SLEEP_EOF
+chmod +x "$MOCK_BIN/sleep"
+
+export PATH="$MOCK_BIN:$PATH"
+export AUTOCODE_CLAUDE_PROMPT_TIMEOUT=4   # 2 poll cycles with no-op sleep in tests
+
 AUTOCODE="$REPO_DIR/bin/claude-code-manager"
 
 describe "claude-code-manager retry — no state"

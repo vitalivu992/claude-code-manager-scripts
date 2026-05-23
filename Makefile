@@ -4,6 +4,7 @@ SHELL         := /bin/bash
 INSTALL_DIR          ?= $(HOME)/.local/bin
 COMMANDS_DIR         ?= $(HOME)/.claude/commands
 DATADIR              ?= $(HOME)/.claude-auto-code
+CONFIGDIR            ?= $(HOME)/.claude-code-manager
 BIN           := $(CURDIR)/bin/claude-code-manager
 
 GREEN  := \033[0;32m
@@ -45,17 +46,24 @@ check: ## Check all required and optional dependencies
 	_check tmux          "tmux"              "apt install tmux"; \
 	_check git           "git"               "apt install git"; \
 	_check realpath      "realpath (coreutils)" "apt install coreutils"; \
-	_check claude "claude"     "install Claude Code CLI and add alias";
+	_check yq            "yq"                "https://github.com/mikefarah/yq — brew install yq / snap install yq"; \
+	_check claude        "claude"            "install Claude Code CLI and add alias";
 
-configure: ## Create data directory and default config file
+configure: ## Create data directory and default config.yaml
 	@printf "$(BOLD)Configuring claude-code-manager-scripts...$(RESET)\n"
 	@mkdir -p "$(DATADIR)"
 	@printf "  $(OK) Created $(DATADIR)\n"
-	@if [ ! -f "$(DATADIR)/config" ]; then \
-		printf '# claude-code-manager per-role command configuration\n# Set the CLI command to use for each role.\n# Environment variables take precedence over this file.\n\nAUTOCODE_CMD_PLANNER=claude\nAUTOCODE_CMD_EXECUTOR=claude\nAUTOCODE_CMD_REVIEWER=claude\nAUTOCODE_CMD_JANITOR=claude\nAUTOCODE_CMD_GIT=git\nAUTOCODE_GIT_PUSH=true\n' > "$(DATADIR)/config"; \
-		printf "  $(OK) Created $(DATADIR)/config\n"; \
+	@mkdir -p "$(CONFIGDIR)"
+	@printf "  $(OK) Created $(CONFIGDIR)\n"
+	@if [ ! -f "$(CONFIGDIR)/config.yaml" ]; then \
+		printf '# claude-code-manager configuration\n# Each role'"'"'s commands list is randomly sampled on every session creation.\n# Add multiple commands to enable random selection across different models/aliases.\n\nroles:\n  planner:\n    commands:\n      - claude\n  executor:\n    commands:\n      - claude\n    idle_threshold: 2\n    max_restarts: 3\n  reviewer:\n    commands:\n      - claude\n  janitor:\n    commands:\n      - claude\n\ngit:\n  command: git\n  push: true\n\ninterval: 30\n' > "$(CONFIGDIR)/config.yaml"; \
+		printf "  $(OK) Created $(CONFIGDIR)/config.yaml\n"; \
 	else \
-		printf "  $(YELLOW)~$(RESET) $(DATADIR)/config already exists, skipping\n"; \
+		printf "  $(YELLOW)~$(RESET) $(CONFIGDIR)/config.yaml already exists, skipping\n"; \
+	fi
+	@if [ -f "$(DATADIR)/config" ]; then \
+		printf "  $(YELLOW)!$(RESET)  Legacy config found at $(DATADIR)/config\n"; \
+		printf "     Settings have moved to $(CONFIGDIR)/config.yaml — you can remove the old file.\n"; \
 	fi
 	@printf "\n$(GREEN)Done!$(RESET) Run 'make install' then 'claude-code-manager help' to get started.\n"
 
@@ -66,12 +74,14 @@ test: ## Run all tests
 	@bash tests/test_retry.sh
 	@bash tests/test_idle_detection.sh
 	@bash tests/test_executor_idle_restart.sh
+	@bash tests/test_config_yaml.sh
+	@bash tests/test_e2e_cmd_selection.sh
 	@printf "\n$(GREEN)All test suites passed.$(RESET)\n"
 
 install: ## Symlink bin/claude-code-manager into ~/.local/bin and copy commands to ~/.claude/commands/
 	@mkdir -p "$(INSTALL_DIR)"
-	@ln -sf "$(BIN)" "$(INSTALL_DIR)/claude-code-manager"
-	@printf "  $(OK) Symlinked $(BIN) -> $(INSTALL_DIR)/claude-code-manager\n"
+	@ln -sf "$(BIN)" "$(INSTALL_DIR)/claude-code-manager-scripts"
+	@printf "  $(OK) Symlinked $(BIN) -> $(INSTALL_DIR)/claude-code-manager-scripts\n"
 	@mkdir -p "$(COMMANDS_DIR)"
 	@cp -u commands/*.md "$(COMMANDS_DIR)/"
 	@printf "  $(OK) Copied commands to $(COMMANDS_DIR)\n"

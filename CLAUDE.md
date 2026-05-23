@@ -171,8 +171,9 @@ All tests use a temporary `TESTTMP` directory and do not touch the real `~/.clau
 
 - **tmux**: Session management
 - **realpath** (from `coreutils`): Resolves absolute repo paths for session naming
+- **yq**: YAML parser used by `load_config` and `pick_cmd_for_role` to read `~/.claude-code-manager/config.yaml`
 - **claude**: Claude Code CLI (used within sessions for `/ralph-loop`, `/planner-*`, `/reviewer-*`)
-- **git**: Version control (configurable via `AUTOCODE_CMD_GIT`)
+- **git**: Version control (configurable via `git.command` in config.yaml)
 
 ## Development Workflow
 
@@ -191,38 +192,38 @@ All four roles are documented in a single unified reference:
 
 ## Configuration
 
-### Per-Role Claude Commands
+All settings live in `~/.claude-code-manager/config.yaml` (created by `make configure`).
 
-Edit `~/.claude-auto-code/config` (created by `make configure`) to set the command for each role:
+```yaml
+roles:
+  planner:
+    commands:
+      - claude
+  executor:
+    commands:
+      - claude
+      - claude-opus          # randomly selected on each session creation
+    idle_threshold: 2
+    max_restarts: 3
+  reviewer:
+    commands:
+      - claude
+  janitor:
+    commands:
+      - claude
 
-```bash
-AUTOCODE_CMD_PLANNER=claude
-AUTOCODE_CMD_EXECUTOR=claude
-AUTOCODE_CMD_REVIEWER=claude
-AUTOCODE_CMD_JANITOR=claude
-AUTOCODE_CMD_GIT=git
-AUTOCODE_GIT_PUSH=true
-AUTOCODE_EXECUTOR_IDLE_THRESHOLD=2
-AUTOCODE_EXECUTOR_MAX_RESTARTS=3
+git:
+  command: git
+  push: true                 # set to false to skip git push after commit
+
+interval: 30                 # polling interval in seconds for 'claude-code-manager run'
 ```
 
-Resolution order (highest priority first):
+Each role's `commands` list is sampled uniformly at random every time a new tmux session is created for that role. A single-item list always selects that one command. This enables load balancing across models or API keys.
 
-1. Environment variable (e.g., `AUTOCODE_CMD_PLANNER=claude-opus claude-code-manager run`)
-2. `~/.claude-auto-code/config`
-3. Built-in default (`claude` for Claude roles, `git` for JANITOR push, `true` for `AUTOCODE_GIT_PUSH`)
+Set `git.push: false` to skip the `git push` step after committing — useful when you want to review changes before pushing or use a CI pipeline instead.
 
-Set `AUTOCODE_GIT_PUSH=false` to skip the `git push` step after committing — useful when you want to review changes before pushing or use a CI pipeline instead.
-
-### Polling Interval
-
-Control how often `claude-code-manager run` polls role scripts:
-
-```bash
-AUTOCODE_INTERVAL=60 claude-code-manager run   # poll every 60 seconds (default: 30)
-```
-
-Run `claude-code-manager status` to see which commands are currently active for each role.
+Run `claude-code-manager status` to see the configured command lists for each role.
 
 ## Script Library
 
@@ -234,7 +235,8 @@ Run `claude-code-manager status` to see which commands are currently active for 
 - `capture_last_lines ROLE [length] [path]` - Capture and print last N lines
 - `is_session_idle ROLE [path]` - Check if session is idle by comparing current pane output (50 lines) against the previous tick's snapshot (`~/.claude-auto-code/{base}.{ROLE}.log.prev`); no blocking sleep
 - `interrupt_current_command ROLE [path]` - Send Ctrl+C to interrupt running command
-- `load_config` - Load `~/.claude-auto-code/config` and set per-role command variables
+- `load_config` - Parse `~/.claude-code-manager/config.yaml` (via `yq`) and set `AUTOCODE_CMD_GIT`, `AUTOCODE_GIT_PUSH`, `AUTOCODE_INTERVAL`, `AUTOCODE_EXECUTOR_IDLE_THRESHOLD`, `AUTOCODE_EXECUTOR_MAX_RESTARTS`; falls back to built-in defaults when the file is absent
+- `pick_cmd_for_role ROLE` - Read `roles.<role>.commands` from `~/.claude-code-manager/config.yaml`, pick one entry uniformly at random, echo it; falls back to `claude` when the file or list is missing
 - `read_state [path]` / `write_state STATE [path]` / `clear_state [path]` - Workflow state management
 - `read_meta KEY [path]` / `write_meta KEY VALUE [path]` / `clear_meta [path]` - Metadata management
 

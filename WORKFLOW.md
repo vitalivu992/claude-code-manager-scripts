@@ -35,7 +35,7 @@ All state lives under `~/.claude-auto-code/`, keyed by a base name derived from 
 | `reviewer:active` | REVIEWER | Polls for approval or gaps |
 | `reviewer:approved` | JANITOR | Starts commit session |
 | `reviewer:gaps` | EXECUTOR | Starts gap-fix iteration (max 3; stops workflow if exceeded) |
-| `janitor:commit` | JANITOR | Polls for commit completion, then pushes (if `AUTOCODE_GIT_PUSH=true`) |
+| `janitor:commit` | JANITOR | Polls for commit completion, then pushes (if `git.push: true` in config.yaml) |
 | `janitor:push` | JANITOR | Polls for push completion, then cleans up (skipped when `AUTOCODE_GIT_PUSH=false`) |
 
 ---
@@ -52,8 +52,8 @@ All state lives under `~/.claude-auto-code/`, keyed by a base name derived from 
 **State is empty → create session and start planning**
 
 - Creates a detached tmux session `<base>-PLANNER`.
-- If `<base>.PLANNER.mail` exists: reads requirements, saves them to `requirements` in metadata, deletes the mail file, launches `$AUTOCODE_CMD_PLANNER`, then sends `/planner-create-plan <requirements>`.
-- Otherwise: launches `$AUTOCODE_CMD_PLANNER /planner-auto-plan`.
+- If `<base>.PLANNER.mail` exists: reads requirements, saves them to `requirements` in metadata, deletes the mail file, launches a randomly selected command from `roles.planner.commands`, then sends `/planner-create-plan <requirements>`.
+- Otherwise: launches `<randomly-selected-command> /planner-auto-plan`.
 - Writes state `planner:active` and `updated_at`.
 
 **State is `planner:active` → poll for completion**
@@ -98,7 +98,7 @@ All state lives under `~/.claude-auto-code/`, keyed by a base name derived from 
 **State is `planner:done` → start execution**
 
 - Reads `plan_path` from metadata.
-- Creates the EXECUTOR session, launches `$AUTOCODE_CMD_EXECUTOR`.
+- Creates the EXECUTOR session, launches a randomly selected command from `roles.executor.commands`.
 - Sends:
   ```
   /ralph-loop:ralph-loop "review existing source code, documents and execute the plan
@@ -111,7 +111,7 @@ All state lives under `~/.claude-auto-code/`, keyed by a base name derived from 
 
 - Reads `plan_path` and `gaps_path` from metadata, increments `review_iteration`.
 - If `review_iteration` would exceed 3: prints a warning, clears all state and metadata, kills all role sessions, and exits. The workflow stops and the user must intervene manually.
-- Otherwise creates the EXECUTOR session, launches `$AUTOCODE_CMD_EXECUTOR`.
+- Otherwise creates the EXECUTOR session, launches a randomly selected command from `roles.executor.commands`.
 - Sends (note priority ordering — gaps plan is PRIMARY):
   ```
   /ralph-loop:ralph-loop "Fix implementation gaps. PRIMARY plan to implement: <gaps_path>
@@ -139,10 +139,10 @@ Both counters are reset to 0 when a fresh session is created (`planner:done` or 
 
 ### Configuration
 
-| Variable | Default | Purpose |
+| YAML key | Default | Purpose |
 |----------|---------|---------|
-| `AUTOCODE_EXECUTOR_IDLE_THRESHOLD` | `2` | Consecutive idle ticks before triggering a restart |
-| `AUTOCODE_EXECUTOR_MAX_RESTARTS` | `3` | Maximum auto-restarts before stopping the workflow |
+| `roles.executor.idle_threshold` | `2` | Consecutive idle ticks before triggering a restart |
+| `roles.executor.max_restarts` | `3` | Maximum auto-restarts before stopping the workflow |
 
 ### Commands used
 
@@ -162,7 +162,7 @@ Both counters are reset to 0 when a fresh session is created (`planner:done` or 
 **State is `executor:done` → start review**
 
 - Reads `plan_path` from metadata.
-- Creates the REVIEWER session, launches `$AUTOCODE_CMD_REVIEWER`.
+- Creates the REVIEWER session, launches a randomly selected command from `roles.reviewer.commands`.
 - Sends `/reviewer-review-impl-gaps <plan_path>`.
 - Writes state `reviewer:active`.
 
@@ -201,15 +201,15 @@ Both counters are reset to 0 when a fresh session is created (`planner:done` or 
 
 **State is `reviewer:approved` → start commit**
 
-- Creates the JANITOR session, launches `$AUTOCODE_CMD_JANITOR`.
+- Creates the JANITOR session, launches a randomly selected command from `roles.janitor.commands`.
 - Sends `/git-commit`.
 - Writes state `janitor:commit`.
 
 **State is `janitor:commit` → push**
 
 - Verifies the JANITOR session exists and is idle.
-- If `AUTOCODE_GIT_PUSH=true` (default): sends `$AUTOCODE_CMD_GIT push` and writes state `janitor:push`.
-- If `AUTOCODE_GIT_PUSH=false`: skips push, immediately clears state/metadata, removes `.lockdir`, and kills all sessions.
+- If `git.push: true` (default): sends `<git.command> push` and writes state `janitor:push`.
+- If `git.push: false`: skips push, immediately clears state/metadata, removes `.lockdir`, and kills all sessions.
 
 **State is `janitor:push` → clean up**
 
@@ -247,4 +247,5 @@ The library functions used across roles:
 | `capture_last_lines ROLE [N] [path]` | Capture last N lines from a role's pane |
 | `read_state / write_state / clear_state` | Workflow state I/O |
 | `read_meta / write_meta / clear_meta` | Metadata key-value I/O |
-| `load_config` | Load `~/.claude-auto-code/config` and set `AUTOCODE_CMD_*` and `AUTOCODE_GIT_PUSH` defaults |
+| `load_config` | Parse `~/.claude-code-manager/config.yaml` (via `yq`) and set `AUTOCODE_CMD_GIT`, `AUTOCODE_GIT_PUSH`, `AUTOCODE_INTERVAL`, `AUTOCODE_EXECUTOR_IDLE_THRESHOLD`, `AUTOCODE_EXECUTOR_MAX_RESTARTS`; falls back to built-in defaults when the file is absent |
+| `pick_cmd_for_role ROLE` | Read `roles.<role>.commands` from `~/.claude-code-manager/config.yaml`, pick one entry uniformly at random, echo it; falls back to `claude` when the file or list is missing |

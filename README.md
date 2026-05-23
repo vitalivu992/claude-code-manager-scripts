@@ -28,6 +28,7 @@ Each role runs in its own tmux session. A directory-based mutex (`.lockdir`) ens
 - **tmux** — session management (`apt install tmux`)
 - **git** — version control (`apt install git`)
 - **realpath** — path resolution (`apt install coreutils`)
+- **yq** — YAML parser for config.yaml (`brew install yq` / `snap install yq` / [github.com/mikefarah/yq](https://github.com/mikefarah/yq))
 - **claude** — [Claude Code CLI](https://claude.ai/code)
 
 Verify everything is in place:
@@ -107,27 +108,36 @@ claude-code-manager stop
 
 ## Configuration
 
-`make configure` creates `~/.claude-auto-code/config` with per-role command overrides:
+`make configure` creates `~/.claude-code-manager/config.yaml`:
 
-```bash
-AUTOCODE_CMD_PLANNER=claude
-AUTOCODE_CMD_EXECUTOR=claude
-AUTOCODE_CMD_REVIEWER=claude
-AUTOCODE_CMD_JANITOR=claude
-AUTOCODE_CMD_GIT=git
+```yaml
+roles:
+  planner:
+    commands:
+      - claude
+  executor:
+    commands:
+      - claude
+      - claude-opus          # randomly selected on each session creation
+    idle_threshold: 2
+    max_restarts: 3
+  reviewer:
+    commands:
+      - claude
+  janitor:
+    commands:
+      - claude
+
+git:
+  command: git
+  push: true                 # set to false to skip git push after commit
+
+interval: 30                 # polling interval in seconds (default: 30)
 ```
 
-You can also override via environment variables (takes highest priority):
+Each role's `commands` list is sampled uniformly at random every time a new tmux session is created for that role. A single-item list always selects that one command. This enables load balancing across models or API keys.
 
-```bash
-AUTOCODE_CMD_EXECUTOR=claude-opus claude-code-manager run
-```
-
-Control the polling interval:
-
-```bash
-AUTOCODE_INTERVAL=60 claude-code-manager run   # poll every 60 seconds (default: 30)
-```
+Set `git.push: false` to skip the `git push` step after committing — useful when you want to review changes before pushing or use a CI pipeline instead.
 
 ## Monitoring Sessions
 

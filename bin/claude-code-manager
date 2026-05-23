@@ -10,8 +10,6 @@ load_config
 datadir="$HOME/.claude-auto-code"
 mkdir -p "$datadir"
 
-AUTOCODE_INTERVAL="${AUTOCODE_INTERVAL:-30}"
-
 _green()  { printf '\033[0;32m%s\033[0m\n' "$*"; }
 _red()    { printf '\033[0;31m%s\033[0m\n' "$*"; }
 _yellow() { printf '\033[0;33m%s\033[0m\n' "$*"; }
@@ -47,21 +45,29 @@ cmd_help() {
     echo "  claude-code-manager retry              # resume from current state and run loop"
     echo "  claude-code-manager retry --once       # resume and run a single tick"
     echo ""
-    echo "OPTIONS"
-    printf "  %-30s %s\n" 'AUTOCODE_INTERVAL=<seconds>'  "Polling interval for 'run' (default: $AUTOCODE_INTERVAL)"
-    printf "  %-30s %s\n" 'AUTOCODE_CMD_PLANNER=<cmd>'   "Claude command for PLANNER role (default: $AUTOCODE_CMD_PLANNER)"
-    printf "  %-30s %s\n" 'AUTOCODE_CMD_EXECUTOR=<cmd>'  "Claude command for EXECUTOR role (default: $AUTOCODE_CMD_EXECUTOR)"
-    printf "  %-30s %s\n" 'AUTOCODE_CMD_REVIEWER=<cmd>'  "Claude command for REVIEWER role (default: $AUTOCODE_CMD_REVIEWER)"
-    printf "  %-30s %s\n" 'AUTOCODE_CMD_JANITOR=<cmd>'   "Commit command for JANITOR role (default: $AUTOCODE_CMD_JANITOR)"
-    printf "  %-30s %s\n" 'AUTOCODE_CMD_GIT=<cmd>'       "Git command for JANITOR push (default: $AUTOCODE_CMD_GIT)"
-    printf "  %-30s %s\n" 'AUTOCODE_GIT_PUSH=true|false' "Whether JANITOR pushes after commit (default: $AUTOCODE_GIT_PUSH)"
+    echo "CONFIGURATION"
+    echo "  All settings live in ~/.claude-code-manager/config.yaml (created by 'make configure')"
     echo ""
-    echo "  Persistent config: ~/.claude-auto-code/config (created by 'make configure')"
+    echo "  roles:"
+    echo "    planner:"
+    echo "      commands: [claude]          # list — one is picked randomly each run"
+    echo "    executor:"
+    echo "      commands: [claude]"
+    echo "      idle_threshold: 2"
+    echo "      max_restarts: 3"
+    echo "    reviewer:"
+    echo "      commands: [claude]"
+    echo "    janitor:"
+    echo "      commands: [claude]"
+    echo "  git:"
+    echo "    command: git"
+    echo "    push: true"
+    echo "  interval: 30"
     echo ""
     echo "INSTALLATION"
     echo "  make install          # create symlink in ~/.local/bin"
-    echo "  make check            # verify all dependencies"
-    echo "  make configure        # set up required directories and commands"
+    echo "  make check            # verify all dependencies (includes yq)"
+    echo "  make configure        # set up required directories and config.yaml"
 
 }
 
@@ -293,11 +299,16 @@ cmd_status() {
     echo "Base:     $base_name"
     echo ""
 
-    _bold "Role commands:"
-    printf "  %-10s %s\n" "PLANNER"  "$AUTOCODE_CMD_PLANNER"
-    printf "  %-10s %s\n" "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR"
-    printf "  %-10s %s\n" "REVIEWER" "$AUTOCODE_CMD_REVIEWER"
-    printf "  %-10s %s\n" "JANITOR"  "$AUTOCODE_CMD_JANITOR"
+    local cfg="$HOME/.claude-code-manager/config.yaml"
+    _bold "Role commands (randomly selected each session):"
+    for role in planner executor reviewer janitor; do
+        local cmds
+        if [ -f "$cfg" ] && command -v yq >/dev/null 2>&1; then
+            cmds=$(yq ".roles.${role}.commands | join(\", \")" "$cfg" 2>/dev/null)
+        fi
+        [ -z "$cmds" ] || [ "$cmds" = "null" ] && cmds="claude (default)"
+        printf "  %-10s [%s]\n" "${role^^}" "$cmds"
+    done
     printf "  %-10s %s\n" "GIT"      "$AUTOCODE_CMD_GIT"
     printf "  %-10s %s\n" "GIT_PUSH" "$AUTOCODE_GIT_PUSH"
     echo ""

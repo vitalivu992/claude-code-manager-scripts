@@ -25,15 +25,17 @@ session_name="${base_name}-PLANNER"
 
 function start_planning_session() {
     echo "Entering the planning session..."
+    local cmd
+    cmd=$(pick_cmd_for_role "planner")
     if [ -f "$datadir/${base_name}.PLANNER.mail" ]; then
         requirements=$(cat "$datadir/${base_name}.PLANNER.mail")
         rm -f "$datadir/${base_name}.PLANNER.mail"
         write_meta "requirements" "$requirements"
-        send_command "PLANNER" "$AUTOCODE_CMD_PLANNER"
-        sleep 10
+        send_command "PLANNER" "$cmd"
+        wait_for_claude_prompt "PLANNER"
         send_command "PLANNER" "/planner-create-plan $requirements"
     else
-        send_command "PLANNER" "$AUTOCODE_CMD_PLANNER /planner-auto-plan"
+        send_command "PLANNER" "$cmd /planner-auto-plan"
     fi
 }
 

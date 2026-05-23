@@ -70,9 +70,10 @@ if [ -z "$plan_file_path" ]; then
     exit 1
 fi
 
+reviewer_cmd=$(pick_cmd_for_role "reviewer")
 create_session "REVIEWER"
-send_command "REVIEWER" "$AUTOCODE_CMD_REVIEWER"
-sleep 10
+send_command "REVIEWER" "$reviewer_cmd"
+wait_for_claude_prompt "REVIEWER"
 send_command "REVIEWER" "/reviewer-review-impl-gaps $plan_file_path"
 
 write_state "reviewer:active"

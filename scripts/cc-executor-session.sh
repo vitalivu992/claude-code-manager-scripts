@@ -85,9 +85,10 @@ if [ "$current_state" = "executor:active" ]; then
     gaps_path=$(read_meta "gaps_path")
     review_iteration=$(read_meta "review_iteration")
 
+    restart_cmd=$(pick_cmd_for_role "executor")
     create_session "EXECUTOR"
-    send_command "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR"
-    sleep 10
+    send_command "EXECUTOR" "$restart_cmd"
+    wait_for_claude_prompt "EXECUTOR"
 
     if [ -n "$gaps_path" ] && [ "${review_iteration:-0}" -gt 0 ]; then
         send_command "EXECUTOR" "/ralph-loop:ralph-loop \"Fix implementation gaps. PRIMARY plan to implement: $gaps_path (this is the revised plan — it supersedes the original). Background context — original plan: $plan_file_path. Review the code changes against the gaps plan, validate which gaps are legitimate, then fix them. Make sure all requirements are fulfilled, all tests pass then output READY_FOR_REVIEW\" --completion-promise \"READY_FOR_REVIEW\""
@@ -126,9 +127,10 @@ if [ "$current_state" = "reviewer:gaps" ]; then
     fi
 fi
 
+fresh_cmd=$(pick_cmd_for_role "executor")
 create_session "EXECUTOR"
-send_command "EXECUTOR" "$AUTOCODE_CMD_EXECUTOR"
-sleep 10
+send_command "EXECUTOR" "$fresh_cmd"
+wait_for_claude_prompt "EXECUTOR"
 write_meta "executor_idle_count" "0"
 write_meta "executor_restart_count" "0"
 

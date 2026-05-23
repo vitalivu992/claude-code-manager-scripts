@@ -98,9 +98,10 @@ if [ "$current_state" = "janitor:commit" ] || [ "$current_state" = "janitor:push
 fi
 
 echo "✅ REVIEWER_APPROVED, starting JANITOR tasks"
+janitor_cmd=$(pick_cmd_for_role "janitor")
 create_session "JANITOR"
-send_command "JANITOR" "$AUTOCODE_CMD_JANITOR"
-sleep 10
+send_command "JANITOR" "$janitor_cmd"
+wait_for_claude_prompt "JANITOR"
 send_command "JANITOR" "/git-commit"
 write_state "janitor:commit"
 write_meta "updated_at" "$(date -Iseconds)"
